@@ -1,0 +1,18 @@
+[package]
+name = "audio-engine"
+description = "Cross-platform real-time audio engine for everec"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+instruments = { path = "../instruments" }
+cpal = { workspace = true }
+crossbeam-channel = { workspace = true }
+parking_lot = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }

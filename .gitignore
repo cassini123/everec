@@ -1,0 +1,16 @@
+/target
+**/*.rs.bk
+Cargo.lock
+
+# Node
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.DS_Store
+*.log
+.env
+.env.*
+
+# Tauri
+apps/desktop/ui/dist/

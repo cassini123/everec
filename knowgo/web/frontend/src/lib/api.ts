@@ -16,7 +16,14 @@ const BASE = "/api/knowgo";
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
-  const data = await res.json();
+  const contentType = res.headers.get("content-type") ?? "";
+  const text = await res.text();
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      `API 返回非 JSON（${res.status}）: ${text.slice(0, 120)}…`,
+    );
+  }
+  const data = JSON.parse(text) as { error?: string };
   if (!res.ok) throw new Error(data.error ?? res.statusText);
   return data as T;
 }

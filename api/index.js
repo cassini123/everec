@@ -2177,6 +2177,7 @@ function splitQuery(query) {
   if (titleFirst) return { title: titleFirst[1].trim(), artist: titleFirst[2].trim() };
   const enLast = q.match(/^(.+?)\s+([\u4e00-\u9fff·][\u4e00-\u9fffA-Za-z·]{1,12})$/);
   if (enLast) return { artist: enLast[2].trim(), title: enLast[1].trim() };
+  if (!/\s/.test(q)) return { title: "", artist: q };
   return { title: q, artist: "" };
 }
 function cleanSongTitle(title) {
@@ -2237,6 +2238,11 @@ function scoreCandidate(query, item) {
 }
 function isRelevantResult(item, query) {
   const hintTitle = normalizeSongTitle(query.title);
+  const hintArtist = query.artist.toLowerCase().replace(/\s/g, "");
+  if (!hintTitle && hintArtist) {
+    const artist = item.artist.toLowerCase().replace(/\s/g, "");
+    return artist.includes(hintArtist);
+  }
   if (!hintTitle) return true;
   const itemTitle = normalizeSongTitle(item.title);
   if (itemTitle === hintTitle || itemTitle.includes(hintTitle) || hintTitle.includes(itemTitle)) {
@@ -2258,17 +2264,25 @@ function mergeResult(base, other) {
     durationMs: base.durationMs || other.durationMs
   };
 }
+function itunesArtworkUrl(raw2) {
+  const url = raw2 ? String(raw2) : "";
+  if (!url) return void 0;
+  return url.replace(/(\d+)x\1bb\.(jpg|png)/i, "600x600bb.$2");
+}
 async function searchItunes(query, limit) {
   const hint = splitQuery(query);
   const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=${limit}&country=CN`;
   const data = await fetchJson(url);
   const results = [];
   for (const item of data.results ?? []) {
+    const kind = String(item.kind ?? item.wrapperType ?? "");
+    if (kind && !kind.includes("song") && kind !== "track") continue;
     const id = String(item.trackId ?? "");
     if (!id) continue;
     const title = cleanSongTitle(String(item.trackName ?? "Unknown"));
     const artist = cleanArtist(String(item.artistName ?? "Unknown"));
-    const album = String(item.collectionName ?? "");
+    const album = String(item.collectionName ?? "").trim();
+    if (!album) continue;
     if (hint.artist && !artist.toLowerCase().includes(hint.artist.toLowerCase().replace(/\s/g, ""))) {
       if (hint.title && !title.toLowerCase().includes(hint.title.toLowerCase().replace(/\s/g, ""))) continue;
     }
@@ -2279,7 +2293,7 @@ async function searchItunes(query, limit) {
       album,
       durationMs: Number(item.trackTimeMillis ?? 0),
       previewUrl: item.previewUrl ? String(item.previewUrl) : void 0,
-      coverUrl: item.artworkUrl100 ? String(item.artworkUrl100) : void 0,
+      coverUrl: itunesArtworkUrl(item.artworkUrl100 ?? item.artworkUrl60),
       source: "itunes"
     });
   }

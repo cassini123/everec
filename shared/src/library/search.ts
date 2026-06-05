@@ -55,6 +55,13 @@ function isRelevantResult(
   query: { title: string; artist: string },
 ): boolean {
   const hintTitle = normalizeSongTitle(query.title);
+  const hintArtist = query.artist.toLowerCase().replace(/\s/g, "");
+
+  if (!hintTitle && hintArtist) {
+    const artist = item.artist.toLowerCase().replace(/\s/g, "");
+    return artist.includes(hintArtist);
+  }
+
   if (!hintTitle) return true;
 
   const itemTitle = normalizeSongTitle(item.title);
@@ -85,6 +92,12 @@ function mergeResult(base: MusicSearchResult, other: MusicSearchResult): MusicSe
   };
 }
 
+function itunesArtworkUrl(raw?: unknown): string | undefined {
+  const url = raw ? String(raw) : "";
+  if (!url) return undefined;
+  return url.replace(/(\d+)x\1bb\.(jpg|png)/i, "600x600bb.$2");
+}
+
 async function searchItunes(query: string, limit: number): Promise<MusicSearchResult[]> {
   const hint = splitQuery(query);
   const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=${limit}&country=CN`;
@@ -92,12 +105,16 @@ async function searchItunes(query: string, limit: number): Promise<MusicSearchRe
   const results: MusicSearchResult[] = [];
 
   for (const item of data.results ?? []) {
+    const kind = String(item.kind ?? item.wrapperType ?? "");
+    if (kind && !kind.includes("song") && kind !== "track") continue;
+
     const id = String(item.trackId ?? "");
     if (!id) continue;
 
     const title = cleanSongTitle(String(item.trackName ?? "Unknown"));
     const artist = cleanArtist(String(item.artistName ?? "Unknown"));
-    const album = String(item.collectionName ?? "");
+    const album = String(item.collectionName ?? "").trim();
+    if (!album) continue;
 
     if (hint.artist && !artist.toLowerCase().includes(hint.artist.toLowerCase().replace(/\s/g, ""))) {
       if (hint.title && !title.toLowerCase().includes(hint.title.toLowerCase().replace(/\s/g, ""))) continue;
@@ -110,7 +127,7 @@ async function searchItunes(query: string, limit: number): Promise<MusicSearchRe
       album,
       durationMs: Number(item.trackTimeMillis ?? 0),
       previewUrl: item.previewUrl ? String(item.previewUrl) : undefined,
-      coverUrl: item.artworkUrl100 ? String(item.artworkUrl100) : undefined,
+      coverUrl: itunesArtworkUrl(item.artworkUrl100 ?? item.artworkUrl60),
       source: "itunes",
     });
   }

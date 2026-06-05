@@ -393,7 +393,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
               </button>
             </div>
             <p className="px-4 pb-2 text-[11px] text-ds-muted">
-              iTunes 曲库搜索，每首歌仅展示一条结果
+              仅 iTunes 曲库，展示专辑封面与曲目信息
             </p>
 
             <div className="flex-1 overflow-auto p-4">
@@ -413,24 +413,20 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
                       {result.coverUrl ? (
                         <img
                           src={result.coverUrl}
-                          alt=""
-                          className="h-12 w-12 rounded object-cover"
+                          alt={result.album}
+                          className="h-14 w-14 shrink-0 rounded-md object-cover shadow-sm"
                         />
                       ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded bg-ds-bg">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-ds-bg">
                           <Music className="h-5 w-5 text-ds-muted" />
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">
-                          {formatResultLabel(result.title, result.artist)}
+                        <div className="truncate text-sm font-medium text-ds-text/90">
+                          {result.album}
                         </div>
                         <div className="truncate text-xs text-ds-muted">
-                          {result.album ? (
-                            <span className="text-ds-text/80">{result.album}</span>
-                          ) : (
-                            <span>单曲</span>
-                          )}
+                          {formatResultLabel(result.title, result.artist)}
                           <span> · {formatDurationMs(result.durationMs)}</span>
                         </div>
                       </div>

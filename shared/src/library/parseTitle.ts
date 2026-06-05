@@ -28,6 +28,9 @@ export function splitQuery(query: string): { title: string; artist: string } {
   const enLast = q.match(/^(.+?)\s+([\u4e00-\u9fff·][\u4e00-\u9fffA-Za-z·]{1,12})$/);
   if (enLast) return { artist: enLast[2]!.trim(), title: enLast[1]!.trim() };
 
+  // 单词搜索视为歌手名，如「窦靖童」
+  if (!/\s/.test(q)) return { title: "", artist: q };
+
   return { title: q, artist: "" };
 }
 

@@ -26,6 +26,7 @@
     "build:simcut": "npm run build --workspace=@simcut/web-frontend",
     "build:prerector": "npm run build --workspace=@everec/prerector-frontend",
     "build:vercel-api": "node api/scripts/build-vercel-api.mjs",
+    "build:vercel-subapis": "node api/scripts/build-vercel-subapis.mjs",
     "build:vercel-knowgo-api": "node knowgo/api/scripts/build-vercel-api.mjs",
     "build:vercel-knowgo": "npm run build:vercel-knowgo-api && npm run build --workspace=@everec/knowgo-frontend",
     "build:vercel-prerector-api": "node prerector/api/scripts/build-vercel-api.mjs",

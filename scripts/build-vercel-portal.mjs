@@ -29,16 +29,10 @@ function rmDir(dir) {
   if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
 }
 
-function copyApiBundle(from, toDir) {
-  fs.mkdirSync(toDir, { recursive: true });
-  fs.copyFileSync(from, path.join(toDir, "index.js"));
-}
-
 console.log("=== Everec unified Vercel build ===");
 
 run("npm run build:vercel-api");
-run("npm run build:vercel-knowgo-api");
-run("npm run build:vercel-prerector-api");
+run("npm run build:vercel-subapis");
 
 run("npm run build --workspace=@simcut/web-frontend", {
   VITE_APP_BASE: "/apps/simcut/",
@@ -67,14 +61,6 @@ for (const app of apps) {
   rmDir(dest);
   copyDir(path.join(root, app.src), dest);
 }
-
-// Vercel Serverless Functions live at repo-root api/, NOT inside portal/dist
-copyApiBundle(path.join(root, "api/index.js"), path.join(root, "api"));
-copyApiBundle(path.join(root, "knowgo/api/index.js"), path.join(root, "api/knowgo"));
-copyApiBundle(
-  path.join(root, "prerector/api/index.js"),
-  path.join(root, "api/prerector"),
-);
 
 console.log("\n=== Build complete ===");
 console.log(`Portal static: ${portalDist}`);

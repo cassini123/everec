@@ -3,15 +3,15 @@
   "installCommand": "cd .. && npm install",
   "buildCommand": "cd .. && npm run build:vercel-prerector",
   "outputDirectory": "web/frontend/dist",
-  "framework": "vite",
+  "framework": null,
   "functions": {
-    "api/**": {
+    "api/index.js": {
       "memory": 1024,
       "maxDuration": 30
     }
   },
   "rewrites": [
-    { "source": "/api/prerector/(.*)", "destination": "/api" },
+    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

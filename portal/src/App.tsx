@@ -8,7 +8,7 @@ import {
   Users,
 } from "lucide-react";
 
-type AppId = "home" | "simcut" | "desound" | "knowgo" | "prerector";
+type AppId = "home" | "hub" | "simcut" | "desound" | "knowgo" | "prerector";
 
 interface NavItem {
   id: AppId;
@@ -26,6 +26,14 @@ const NAV_ITEMS: NavItem[] = [
     subtitle: "Creative OS 入口",
     icon: Home,
     color: "var(--color-ev-accent)",
+  },
+  {
+    id: "hub",
+    label: "主脑 Hub",
+    subtitle: "Creative OS 中央启动器",
+    icon: Layers,
+    color: "var(--color-ev-hub)",
+    href: "/apps/hub/",
   },
   {
     id: "simcut",
@@ -62,6 +70,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 function pathToApp(pathname: string): AppId {
+  if (pathname.startsWith("/hub")) return "hub";
   if (pathname.startsWith("/simcut")) return "simcut";
   if (pathname.startsWith("/desound")) return "desound";
   if (pathname.startsWith("/knowgo")) return "knowgo";
@@ -189,7 +198,7 @@ function HomeView({ onNavigate }: { onNavigate: (app: AppId) => void }) {
       <div className="mx-auto w-full max-w-4xl">
         <h1 className="text-3xl font-semibold tracking-tight">Everec Creative OS</h1>
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-ev-muted">
-          Simcut、Desound、Knowgo、Prerector 四个产品 Web 端已合并为统一入口。请从左侧目录选择产品，或点击下方卡片进入。
+          Hub、Simcut、Desound、Knowgo、Prerector 五个产品 Web 端已合并为统一入口。请从左侧目录选择产品，或点击下方卡片进入。
         </p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -224,7 +233,7 @@ function HomeView({ onNavigate }: { onNavigate: (app: AppId) => void }) {
         <div className="mt-12 rounded-2xl border border-ev-border bg-ev-surface/50 p-6">
           <h2 className="text-sm font-medium text-ev-muted">部署说明</h2>
           <ul className="mt-3 space-y-2 text-sm text-ev-muted">
-            <li>· 四个产品共享同一 Vercel 域名，Root Directory 设为仓库根 <code className="text-ev-text">/</code></li>
+            <li>· 五个产品共享同一 Vercel 域名，Root Directory 设为仓库根 <code className="text-ev-text">/</code></li>
             <li>· Desound API：<code className="text-ev-text">/api/*</code></li>
             <li>· Knowgo API：<code className="text-ev-text">/api/knowgo/*</code></li>
             <li>· Prerector API：<code className="text-ev-text">/api/prerector/*</code></li>

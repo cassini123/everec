@@ -12,10 +12,12 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/apps/hub/(.*)", "destination": "/apps/hub/index.html" },
     { "source": "/apps/simcut/(.*)", "destination": "/apps/simcut/index.html" },
     { "source": "/apps/desound/(.*)", "destination": "/apps/desound/index.html" },
     { "source": "/apps/knowgo/(.*)", "destination": "/apps/knowgo/index.html" },
     { "source": "/apps/prerector/(.*)", "destination": "/apps/prerector/index.html" },
+    { "source": "/hub", "destination": "/index.html" },
     { "source": "/simcut", "destination": "/index.html" },
     { "source": "/desound", "destination": "/index.html" },
     { "source": "/knowgo", "destination": "/index.html" },

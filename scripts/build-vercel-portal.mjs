@@ -50,10 +50,14 @@ run("npm run build --workspace=@everec/knowgo-frontend", {
 run("npm run build --workspace=@everec/prerector-frontend", {
   VITE_APP_BASE: "/apps/prerector/",
 });
+run("npm run build --workspace=@everec/hub-frontend", {
+  VITE_APP_BASE: "/apps/hub/",
+});
 
 run("npm run build --workspace=@everec/portal");
 
 const apps = [
+  { name: "hub", src: "hub/web/frontend/dist" },
   { name: "simcut", src: "simcut/web/frontend/dist" },
   { name: "desound", src: "desound/web/frontend/dist" },
   { name: "knowgo", src: "knowgo/web/frontend/dist" },

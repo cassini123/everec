@@ -12,6 +12,7 @@ import { EffectsView } from "./views/EffectsView";
 import { FontsView } from "./views/FontsView";
 import { AiView } from "./views/AiView";
 import { api } from "./lib/api";
+import { timelineExtentMs } from "./lib/timelineLayout";
 import type { Project, ProjectSummary, Workspace } from "./types";
 
 const SEEK_STEP_MS = 500;
@@ -56,10 +57,13 @@ export default function App() {
 
   const seekBy = useCallback(
     (deltaMs: number) => {
-      const max = project?.durationMs ?? 0;
-      setPositionMs((ms) => Math.max(0, Math.min(max, ms + deltaMs)));
+      if (!project) return;
+      setPositionMs((ms) => {
+        const max = timelineExtentMs(project.durationMs, ms);
+        return Math.max(0, Math.min(max, ms + deltaMs));
+      });
     },
-    [project?.durationMs],
+    [project],
   );
 
   useEffect(() => {

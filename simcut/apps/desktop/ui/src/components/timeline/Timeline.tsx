@@ -4,6 +4,7 @@ import { formatTimecode } from "../../lib/timecode";
 import {
   msFromTimelineX,
   pxFromMs,
+  timelineExtentMs,
   timelineWidthPx,
 } from "../../lib/timelineLayout";
 import { findMedia, snapMs } from "../../lib/timelineEdit";
@@ -34,10 +35,9 @@ export function Timeline({
   onRemoveClip,
 }: Props) {
   const fps = project.fps || 30;
-  const duration = Math.max(project.durationMs, 10000);
-  const widthPx = timelineWidthPx(duration);
+  const extentMs = timelineExtentMs(project.durationMs, positionMs);
+  const widthPx = timelineWidthPx(extentMs);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const trackRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const dragRef = useRef<{
     clipId: string;
     mode: DragMode;
@@ -46,19 +46,19 @@ export function Timeline({
     origDuration: number;
     scrollLeft: number;
   } | null>(null);
+  const panRef = useRef<{ startX: number; scrollLeft: number } | null>(null);
+  const playheadDragRef = useRef(false);
   const [dragOverTrack, setDragOverTrack] = useState<number | null>(null);
 
-  const msFromClientX = useCallback(
-    (clientX: number) => {
-      const scroll = scrollRef.current;
-      if (!scroll) return 0;
-      const rect = scroll.getBoundingClientRect();
-      return snapMs(msFromTimelineX(scroll.scrollLeft, clientX, rect.left));
-    },
-    [],
-  );
+  const msFromClientX = useCallback((clientX: number) => {
+    const scroll = scrollRef.current;
+    if (!scroll) return 0;
+    const rect = scroll.getBoundingClientRect();
+    return snapMs(msFromTimelineX(scroll.scrollLeft, clientX, rect.left));
+  }, []);
 
   const scrollPlayheadIntoView = useCallback(() => {
+    if (playheadDragRef.current || panRef.current) return;
     const scroll = scrollRef.current;
     if (!scroll) return;
     const playheadPx = pxFromMs(positionMs);
@@ -85,11 +85,41 @@ export function Timeline({
     scroll.scrollLeft += delta;
   };
 
-  const handlePointerDown = (
-    e: React.PointerEvent,
-    clip: Clip,
-    mode: DragMode,
-  ) => {
+  const startPan = (e: React.PointerEvent) => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    panRef.current = { startX: e.clientX, scrollLeft: scroll.scrollLeft };
+  };
+
+  const handlePanMove = (e: React.PointerEvent) => {
+    const pan = panRef.current;
+    const scroll = scrollRef.current;
+    if (!pan || !scroll) return;
+    scroll.scrollLeft = pan.scrollLeft - (e.clientX - pan.startX);
+  };
+
+  const endPan = () => {
+    panRef.current = null;
+  };
+
+  const startPlayheadDrag = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    playheadDragRef.current = true;
+  };
+
+  const handlePlayheadMove = (e: React.PointerEvent) => {
+    if (!playheadDragRef.current) return;
+    onSeek(msFromClientX(e.clientX));
+  };
+
+  const endPlayheadDrag = () => {
+    playheadDragRef.current = false;
+  };
+
+  const handlePointerDown = (e: React.PointerEvent, clip: Clip, mode: DragMode) => {
     e.stopPropagation();
     e.preventDefault();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -110,7 +140,7 @@ export function Timeline({
     const scroll = scrollRef.current;
     const scrollDelta = (scroll?.scrollLeft ?? 0) - drag.scrollLeft;
     const deltaPx = e.clientX - drag.startX + scrollDelta;
-    const deltaMs = (deltaPx / timelineWidthPx(duration)) * duration;
+    const deltaMs = (deltaPx / timelineWidthPx(extentMs)) * extentMs;
 
     if (drag.mode === "move") {
       onUpdateClip(drag.clipId, {
@@ -129,7 +159,8 @@ export function Timeline({
   };
 
   const handleTrackClick = (e: React.MouseEvent) => {
-    if (dragRef.current) return;
+    if (dragRef.current || panRef.current || playheadDragRef.current) return;
+    if (e.shiftKey) return;
     onSeek(msFromClientX(e.clientX));
     onSelectClip(null);
   };
@@ -152,14 +183,29 @@ export function Timeline({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-sc-track">
+      <div className="flex items-center justify-between px-3 py-1 text-[10px] text-sc-muted">
+        <span>拖播放头定位 · Shift+拖动平移工作区 · 触控板左右滑动</span>
+      </div>
       <div
         ref={scrollRef}
         className="relative min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-3"
         onWheel={handleWheel}
+        onPointerDown={(e) => {
+          if (e.shiftKey && e.button === 0) startPan(e);
+        }}
+        onPointerMove={(e) => {
+          handlePanMove(e);
+          handlePlayheadMove(e);
+        }}
+        onPointerUp={() => {
+          endPan();
+          endPlayheadDrag();
+        }}
+        style={{ cursor: panRef.current ? "grabbing" : undefined }}
       >
         <div className="relative" style={{ width: widthPx, minWidth: "100%" }}>
           <TimecodeRuler
-            durationMs={duration}
+            durationMs={extentMs}
             positionMs={positionMs}
             fps={fps}
             widthPx={widthPx}
@@ -176,9 +222,6 @@ export function Timeline({
                 <Trash2 size={10} />
                 删除片段
               </button>
-              <span className="text-[10px] text-sc-muted">
-                拖移片段 · 拖右边缘裁剪 · 触控板左右滑动浏览
-              </span>
             </div>
           )}
 
@@ -189,9 +232,6 @@ export function Timeline({
                 <span className="rounded bg-sc-panel px-1.5 py-0.5 uppercase">{track.kind}</span>
               </div>
               <div
-                ref={(el) => {
-                  if (el) trackRefs.current.set(track.index, el);
-                }}
                 className={`relative h-12 rounded-md border bg-sc-panel/50 transition-colors ${
                   dragOverTrack === track.index
                     ? "border-sc-accent bg-sc-accent/5"
@@ -248,10 +288,21 @@ export function Timeline({
             </div>
           ))}
 
+          {/* 可拖动播放头 */}
           <div
-            className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-sc-warm"
-            style={{ left: playheadPx }}
-          />
+            className="absolute top-0 bottom-0 z-20"
+            style={{ left: playheadPx, transform: "translateX(-50%)" }}
+          >
+            <div
+              className="flex cursor-ew-resize flex-col items-center"
+              onPointerDown={startPlayheadDrag}
+              onPointerMove={handlePlayheadMove}
+              onPointerUp={endPlayheadDrag}
+            >
+              <div className="h-0 w-0 border-x-[6px] border-t-[8px] border-x-transparent border-t-sc-warm" />
+              <div className="w-0.5 flex-1 bg-sc-warm shadow-[0_0_6px_rgba(245,158,108,0.6)]" />
+            </div>
+          </div>
         </div>
       </div>
     </div>

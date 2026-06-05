@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Bookmark, Plus } from "lucide-react";
+import { StillPreviewModal } from "../components/stills/StillPreviewModal";
 import { api, formatMs } from "../lib/api";
-import type { Project } from "../types";
+import type { Project, StillFrame } from "../types";
 
 interface Props {
   project: Project;
@@ -12,6 +13,7 @@ interface Props {
 export function StillsView({ project, positionMs, onUpdate }: Props) {
   const [label, setLabel] = useState("");
   const [message, setMessage] = useState("");
+  const [previewStill, setPreviewStill] = useState<StillFrame | null>(null);
 
   const handleCapture = async () => {
     const media = project.media[0];
@@ -44,7 +46,7 @@ export function StillsView({ project, positionMs, onUpdate }: Props) {
           静帧管理
         </h1>
         <p className="mt-1 text-sm text-sc-muted">
-          捕捉关键画面，关联色彩参考与风格标签
+          捕捉关键画面，点击静帧可预览大图
         </p>
       </div>
 
@@ -71,9 +73,11 @@ export function StillsView({ project, positionMs, onUpdate }: Props) {
 
       <div className="grid flex-1 grid-cols-2 gap-3 overflow-auto md:grid-cols-3 lg:grid-cols-4">
         {project.stills.map((still) => (
-          <div
+          <button
             key={still.id}
-            className="rounded-xl border border-sc-border bg-sc-panel p-3"
+            type="button"
+            onClick={() => setPreviewStill(still)}
+            className="rounded-xl border border-sc-border bg-sc-panel p-3 text-left transition-colors hover:border-sc-accent hover:bg-sc-panel/80"
           >
             <div className="mb-2 flex h-24 items-center justify-center overflow-hidden rounded-lg bg-sc-track text-sc-muted">
               {still.thumbnail ? (
@@ -99,14 +103,16 @@ export function StillsView({ project, positionMs, onUpdate }: Props) {
                 />
               ))}
             </div>
-          </div>
+          </button>
         ))}
         {project.stills.length === 0 && (
           <div className="col-span-full py-16 text-center text-sm text-sc-muted">
-            在时间轴上定位后捕捉静帧
+            在剪辑预览中点击相机图标，或在时间轴定位后捕捉静帧
           </div>
         )}
       </div>
+
+      <StillPreviewModal still={previewStill} onClose={() => setPreviewStill(null)} />
     </div>
   );
 }

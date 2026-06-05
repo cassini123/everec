@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, Film, Image, Upload, Video } from "lucide-react";
 import { AspectRatioPicker } from "../components/edit/AspectRatioPicker";
+import { ResizableSplit } from "../components/edit/ResizableSplit";
 import { MediaBin } from "../components/timeline/MediaBin";
 import { Timeline } from "../components/timeline/Timeline";
 import { api, formatMs } from "../lib/api";
@@ -203,9 +204,8 @@ export function EditView({
 
   const canCapture = !!previewUrl && !loadError;
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="relative flex h-56 shrink-0 flex-col border-b border-sc-border bg-black">
+  const previewPanel = (
+    <div className="relative flex h-full flex-col bg-black">
         <div className="flex items-center justify-between px-3 py-2">
           <span className="text-xs text-sc-muted">
             预览
@@ -302,14 +302,16 @@ export function EditView({
             {message}
           </div>
         )}
-      </div>
+    </div>
+  );
 
+  const workspacePanel = (
+    <>
       <MediaBin
         media={project.media}
         selectedMediaId={selectedMediaId}
         onSelect={setSelectedMediaId}
       />
-
       <Timeline
         project={project}
         positionMs={positionMs}
@@ -320,6 +322,12 @@ export function EditView({
         onDropMedia={handleDropMedia}
         onRemoveClip={handleRemoveClip}
       />
+    </>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <ResizableSplit>{[previewPanel, workspacePanel]}</ResizableSplit>
     </div>
   );
 }

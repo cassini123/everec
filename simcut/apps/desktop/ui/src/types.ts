@@ -120,11 +120,21 @@ export interface LutPreset {
   lutCube: string;
 }
 
+export interface WaveformScope {
+  columns: number;
+  luma: number[][];
+  r: number[][];
+  g: number[][];
+  b: number[][];
+}
+
 export interface WaveformData {
   luma: number[];
   r: number[];
   g: number[];
   b: number[];
+  /** 列采样空间波形（监视器风格） */
+  scope?: WaveformScope;
 }
 
 export interface ColorAnalysisResult {

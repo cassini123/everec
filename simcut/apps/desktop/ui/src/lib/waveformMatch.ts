@@ -1,4 +1,5 @@
-import type { ColorAnalysisResult, ColorSwatch, Pixel, WaveformData } from "../types";
+import type { ColorAnalysisResult, ColorSwatch, Pixel, WaveformData, WaveformScope } from "../types";
+import { computeWaveformScope } from "./waveformScope";
 
 const BINS = 256;
 
@@ -35,13 +36,14 @@ export function computeRgbParade(pixels: Pixel[]): { r: number[]; g: number[]; b
   };
 }
 
-export function buildWaveformData(pixels: Pixel[]): WaveformData {
+export function buildWaveformData(pixels: Pixel[], scope?: WaveformScope): WaveformData {
   const parade = computeRgbParade(pixels);
   return {
     luma: computeLumaWaveform(pixels),
     r: parade.r,
     g: parade.g,
     b: parade.b,
+    scope,
   };
 }
 
@@ -139,12 +141,13 @@ function generateLutCubeFromCurves(
 export interface WaveformMatchOptions {
   referencePixels: Pixel[];
   sourcePixels?: Pixel[];
+  referenceScope?: WaveformScope;
 }
 
 /** 色彩波形匹配解析 */
 export function analyzeWithWaveformMatch(opts: WaveformMatchOptions): ColorAnalysisResult {
-  const { referencePixels, sourcePixels } = opts;
-  const refWf = buildWaveformData(referencePixels);
+  const { referencePixels, sourcePixels, referenceScope } = opts;
+  const refWf = buildWaveformData(referencePixels, referenceScope);
   const srcWf = sourcePixels
     ? buildWaveformData(sourcePixels)
     : { luma: uniformHist(), r: uniformHist(), g: uniformHist(), b: uniformHist() };
@@ -213,7 +216,12 @@ export function analyzeWithWaveformMatch(opts: WaveformMatchOptions): ColorAnaly
   };
 }
 
-export function loadImagePixels(file: File): Promise<Pixel[]> {
+export interface ImagePixelData {
+  pixels: Pixel[];
+  scope: WaveformScope;
+}
+
+export function loadImagePixels(file: File): Promise<ImagePixelData> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -229,14 +237,19 @@ export function loadImagePixels(file: File): Promise<Pixel[]> {
         return;
       }
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const scope = computeWaveformScope(imageData.data, canvas.width, canvas.height);
       const pixels: Pixel[] = [];
       const step = Math.max(4, Math.floor((canvas.width * canvas.height) / 65536) * 4);
-      for (let i = 0; i < data.length; i += step) {
-        pixels.push({ r: data[i], g: data[i + 1], b: data[i + 2] });
+      for (let i = 0; i < imageData.data.length; i += step) {
+        pixels.push({
+          r: imageData.data[i],
+          g: imageData.data[i + 1],
+          b: imageData.data[i + 2],
+        });
       }
       URL.revokeObjectURL(url);
-      resolve(pixels);
+      resolve({ pixels, scope });
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);

@@ -59,7 +59,7 @@ export function TimecodeRuler({
           );
         })}
         <div
-          className="absolute top-0 bottom-0 w-0.5 bg-sc-warm"
+          className="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-sc-warm"
           style={{ left: playheadPx }}
         />
       </div>

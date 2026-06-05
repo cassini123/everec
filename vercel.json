@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm install",
   "buildCommand": "npm run build --workspace=@everec/web-frontend",
-  "outputDirectory": "web/frontend/dist",
+  "outputDirectory": "desound/web/frontend/dist",
   "framework": "vite",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" }

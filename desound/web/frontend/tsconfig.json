@@ -15,7 +15,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {
-      "@everec/shared": ["../../shared/src/index.ts"]
+      "@everec/shared": ["../../../shared/src/index.ts"]
     }
   },
   "include": ["src"]

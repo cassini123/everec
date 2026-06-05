@@ -7,5 +7,6 @@ await esbuild.build({
   target: "node20",
   format: "esm",
   outfile: "api/index.js",
+  external: ["better-sqlite3"],
   logLevel: "info",
 });

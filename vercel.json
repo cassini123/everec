@@ -8,19 +8,9 @@
     "api/index.js": {
       "memory": 1024,
       "maxDuration": 30
-    },
-    "api/knowgo/index.js": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/prerector/index.js": {
-      "memory": 1024,
-      "maxDuration": 30
     }
   },
   "rewrites": [
-    { "source": "/api/knowgo/(.*)", "destination": "/api/knowgo" },
-    { "source": "/api/prerector/(.*)", "destination": "/api/prerector" },
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/apps/simcut/(.*)", "destination": "/apps/simcut/index.html" },
     { "source": "/apps/desound/(.*)", "destination": "/apps/desound/index.html" },

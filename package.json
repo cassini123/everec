@@ -9,9 +9,11 @@
     "desound/desktop/ui",
     "simcut/web/frontend",
     "knowgo/web/frontend",
-    "knowgo/web/backend"
+    "knowgo/web/backend",
+    "hub/web/frontend"
   ],
   "scripts": {
+    "dev:hub": "npm run dev --workspace=@everec/hub-frontend",
     "dev:web": "npm run dev --workspace=@everec/web-backend & npm run dev --workspace=@everec/web-frontend",
     "dev:knowgo": "npm run dev --workspace=@everec/knowgo-backend & npm run dev --workspace=@everec/knowgo-frontend",
     "dev:simcut": "npm run dev --workspace=@simcut/web-frontend",
@@ -19,6 +21,7 @@
     "build:web": "npm run build --workspace=@everec/web-frontend",
     "build:knowgo": "npm run build --workspace=@everec/knowgo-backend && npm run build --workspace=@everec/knowgo-frontend",
     "build:simcut": "npm run build --workspace=@simcut/web-frontend",
+    "build:hub": "npm run build --workspace=@everec/hub-frontend",
     "build:vercel-api": "node api/scripts/build-vercel-api.mjs",
     "build:vercel-knowgo-api": "node knowgo/api/scripts/build-vercel-api.mjs",
     "build:vercel-knowgo": "npm run build:vercel-knowgo-api && npm run build --workspace=@everec/knowgo-frontend",

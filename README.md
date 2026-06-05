@@ -4,6 +4,7 @@
 
 | 项目 | 路径 | 说明 |
 |------|------|------|
+| **主脑 (Hub)** | `hub/` | Creative OS 中央启动器（统筹全部应用） |
 | **Simcut** | `simcut/` | 轻量视频剪辑（Web + 桌面） |
 | **desound** | `desound/` | 音频 / 音效创作 |
 | **Knowgo** | `knowgo/` | 视觉灵感认知 + Project Graph |
@@ -23,11 +24,19 @@
 
 验证：`curl https://<域名>/api/knowgo/health`
 
+### 主脑 (Hub) 本地
+
+```bash
+npm install
+npm run dev:hub
+# http://localhost:1400
+```
+
 ### Simcut Web 本地
 
 ```bash
 npm run dev:simcut
-# 或 cd simcut/web/frontend && npm install && npm run dev
+# http://localhost:1422
 ```
 
 ### Knowgo 本地
@@ -48,6 +57,7 @@ npm run dev:web
 
 ```text
 everec/
+├── hub/              # 主脑 — Creative OS 启动器
 ├── simcut/           # 视频剪辑
 ├── desound/          # 音频创作
 ├── knowgo/           # 视觉灵感（独立 Vercel Web）

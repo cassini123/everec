@@ -19,6 +19,10 @@ interface FoleyViewProps {
   onSaved: () => void;
 }
 
+function formatSfxMeta(item: SfxSearchResult): string {
+  return [item.sourceLabel ?? item.source, item.creator, item.license].filter(Boolean).join(" · ");
+}
+
 export function FoleyView({
   sounds,
   projects,
@@ -146,7 +150,7 @@ export function FoleyView({
       setSfxPreviewId(null);
       return;
     }
-    audio.src = item.previewUrl;
+    audio.src = api.getSfxPreviewUrl(item);
     audio.play().catch(() => alert("预览失败"));
     setSfxPreviewId(item.id);
   };
@@ -248,6 +252,7 @@ export function FoleyView({
             {sfxResults.map((item) => (
               <div key={item.id} className="rounded bg-ds-panel px-2 py-1.5">
                 <div className="truncate text-[11px] font-medium">{item.title}</div>
+                <div className="mt-0.5 truncate text-[10px] text-ds-muted">{formatSfxMeta(item)}</div>
                 <div className="mt-1 flex gap-1">
                   <button
                     type="button"

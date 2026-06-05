@@ -152,6 +152,9 @@ export const api = {
   searchSfxOnline: (q: string, limit = 12) =>
     request<SfxSearchResult[]>(`/search/sfx?q=${encodeURIComponent(q)}&limit=${limit}`),
 
+  getSfxPreviewUrl: (result: SfxSearchResult) =>
+    api.getMediaProxyUrl(result.previewUrl, result.referer),
+
   getSearchPlayUrl: (result: MusicSearchResult) => {
     const params = new URLSearchParams({
       resultId: result.id,

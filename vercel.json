@@ -5,7 +5,7 @@
   "outputDirectory": "portal/dist",
   "framework": null,
   "functions": {
-    "api/index.js": {
+    "api/index.ts": {
       "memory": 1024,
       "maxDuration": 30
     }

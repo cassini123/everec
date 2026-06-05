@@ -31,8 +31,6 @@ function rmDir(dir) {
 
 console.log("=== Everec unified Vercel build ===");
 
-run("npm run build:vercel-api");
-
 run("npm run build --workspace=@simcut/web-frontend", {
   VITE_APP_BASE: "/apps/simcut/",
 });
@@ -63,4 +61,4 @@ for (const app of apps) {
 
 console.log("\n=== Build complete ===");
 console.log(`Portal static: ${portalDist}`);
-console.log("API function: api/index.js (desound + knowgo + prerector)");
+console.log("API function: api/index.ts (desound + knowgo + prerector)");

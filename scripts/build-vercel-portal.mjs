@@ -32,8 +32,7 @@ function rmDir(dir) {
 console.log("=== Everec unified Vercel build ===");
 
 run("npm run build:vercel-api");
-run("npm run build:vercel-knowgo-api");
-run("npm run build:vercel-prerector-api");
+run("npm run build:vercel-subapis");
 
 run("npm run build --workspace=@simcut/web-frontend", {
   VITE_APP_BASE: "/apps/simcut/",
@@ -62,24 +61,6 @@ for (const app of apps) {
   rmDir(dest);
   copyDir(path.join(root, app.src), dest);
 }
-
-const apiDest = path.join(portalDist, "api");
-fs.mkdirSync(apiDest, { recursive: true });
-fs.copyFileSync(path.join(root, "api/index.js"), path.join(apiDest, "index.js"));
-
-const knowgoApiDest = path.join(apiDest, "knowgo");
-fs.mkdirSync(knowgoApiDest, { recursive: true });
-fs.copyFileSync(
-  path.join(root, "knowgo/api/index.js"),
-  path.join(knowgoApiDest, "index.js"),
-);
-
-const prerectorApiDest = path.join(apiDest, "prerector");
-fs.mkdirSync(prerectorApiDest, { recursive: true });
-fs.copyFileSync(
-  path.join(root, "prerector/api/index.js"),
-  path.join(prerectorApiDest, "index.js"),
-);
 
 console.log("\n=== Build complete ===");
 console.log(`Output: ${portalDist}`);

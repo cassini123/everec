@@ -5,7 +5,15 @@
   "outputDirectory": "portal/dist",
   "framework": null,
   "functions": {
-    "api/**": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/knowgo/index.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/prerector/index.js": {
       "memory": 1024,
       "maxDuration": 30
     }

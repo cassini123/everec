@@ -3,6 +3,8 @@ node_modules/
 dist/
 **/dist/
 api/index.js
+api/knowgo/index.js
+api/prerector/index.js
 knowgo/api/index.js
 prerector/api/index.js
 target/

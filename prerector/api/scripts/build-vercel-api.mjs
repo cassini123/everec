@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 await esbuild.build({
-  entryPoints: [path.join(__dirname, "../_entry.ts")],
+  entryPoints: [path.join(__dirname, "../index.ts")],
   bundle: true,
   platform: "node",
   target: "node20",

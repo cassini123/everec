@@ -2563,10 +2563,17 @@ async function searchSfxOnline(query, limit = 12) {
   return unique;
 }
 
-// desound/web/backend/src/library/store.ts
-import fs from "node:fs";
-import path from "node:path";
-import { spawnSync } from "node:child_process";
+// shared/src/knowgo/types.ts
+var DEFAULT_DOCUMENT = {
+  title: "\u7075\u611F\u5206\u6790\u6587\u6863",
+  sections: [
+    { id: "overview", heading: "\u9879\u76EE\u6982\u8FF0", content: "", mediaIds: [] },
+    { id: "inspiration", heading: "\u7075\u611F\u6765\u6E90", content: "", mediaIds: [] },
+    { id: "visual", heading: "\u89C6\u89C9\u8BED\u8A00", content: "", mediaIds: [] },
+    { id: "implementation", heading: "\u5B9E\u73B0\u65B9\u6848", content: "", mediaIds: [] }
+  ],
+  updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+};
 
 // node_modules/uuid/dist/esm/stringify.js
 var byteToHex = [];
@@ -2620,6 +2627,9 @@ function v4(options, buf, offset) {
 var v4_default = v4;
 
 // desound/web/backend/src/library/store.ts
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 function dataRoot() {
   if (process.env.LIBRARY_DATA_DIR) return process.env.LIBRARY_DATA_DIR;
   if (process.env.VERCEL) return "/tmp/everec-library";

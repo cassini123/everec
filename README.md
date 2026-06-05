@@ -27,7 +27,7 @@ npm install
 npm run dev
 ```
 
-浏览器打开 **http://localhost:1421**
+浏览器打开终端里显示的地址（默认 **http://localhost:1421**，端口占用时会自动用 1422 等）
 
 ### 一键启动（已克隆过）
 
@@ -43,3 +43,16 @@ cd ~/Desktop/everec    # 换成你的 everec 路径
 | `fatal: not a git repository` | 当前目录不是 everec | 先 `cd` 到 everec 目录 |
 | `cd: no such file or directory: simcut/...` | 没克隆仓库或在 main 分支 | 执行上面的 clone + checkout |
 | `npm ENOENT package.json` | 路径不对 | 确认 `pwd` 显示 `.../everec/simcut/apps/desktop/ui` |
+| `Port 1421 is already in use` | 上次 dev 没关 | 见下方「端口占用」 |
+
+### 端口占用
+
+```bash
+# 查找并关闭占用 1421 的进程（Mac）
+lsof -ti :1421 | xargs kill -9
+
+# 然后重新启动
+npm run dev
+```
+
+或直接再跑一次 `npm run dev`，新版配置会自动改用 1422 等空闲端口。

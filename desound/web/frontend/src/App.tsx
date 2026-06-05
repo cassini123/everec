@@ -283,10 +283,6 @@ export default function App() {
         onExport={() => {}}
       />
 
-      <div className="absolute right-4 top-14 rounded bg-ds-accent/20 px-2 py-1 text-[11px] text-ds-accent">
-        Web 端
-      </div>
-
       {initError && (
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded bg-red-950/90 px-4 py-2 text-xs text-red-300">
           {initError}

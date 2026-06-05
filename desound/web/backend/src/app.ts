@@ -193,6 +193,7 @@ app.get("/search/play", async (c) => {
   const artist = c.req.query("artist") ?? "";
   const source = c.req.query("source") ?? "";
   const previewUrl = c.req.query("previewUrl") ?? "";
+  const playBvid = c.req.query("playBvid") ?? "";
 
   try {
     const resolved = await resolveMusicAudioUrl({
@@ -203,6 +204,7 @@ app.get("/search/play", async (c) => {
       durationMs: 0,
       source,
       previewUrl: previewUrl || undefined,
+      playBvid: playBvid || undefined,
     });
 
     const headers: Record<string, string> = { "User-Agent": "Mozilla/5.0" };

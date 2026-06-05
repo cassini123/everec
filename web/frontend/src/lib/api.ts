@@ -12,8 +12,17 @@ const API = "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, init);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
+  let data: unknown = {};
+  const text = await res.text();
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { error: text || `HTTP ${res.status}` };
+  }
+  if (!res.ok) {
+    const msg = (data as { error?: string }).error ?? `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
   return data as T;
 }
 

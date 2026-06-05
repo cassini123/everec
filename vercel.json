@@ -4,7 +4,10 @@
   "buildCommand": "npm run build --workspace=@everec/web-frontend",
   "outputDirectory": "web/frontend/dist",
   "framework": "vite",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" }
-  ]
+  "functions": {
+    "api/**": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  }
 }

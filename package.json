@@ -14,6 +14,8 @@
     "build:desktop": "npm run ui:build --prefix desktop-client"
   },
   "dependencies": {
-    "hono": "^4.7.10"
+    "@everec/shared": "*",
+    "hono": "^4.7.10",
+    "uuid": "^11.1.0"
   }
 }

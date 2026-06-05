@@ -23,15 +23,26 @@
 
 ## 快速开始
 
-### 网页端（推荐先体验）
+> **首次使用请先克隆仓库并切换到 simcut 分支**（simcut 目前在 `cursor/simcut-init-f20e`，尚未合并到 main）
 
 ```bash
+# 1. 克隆仓库（若已有 everec 目录可跳过）
+git clone https://github.com/cassini123/everec.git
+cd everec
+
+# 2. 拉取 simcut 分支
+git fetch origin cursor/simcut-init-f20e
+git checkout cursor/simcut-init-f20e
+
+# 3. 进入 UI 目录（必须在 everec 仓库根目录下执行）
 cd simcut/apps/desktop/ui
 npm install
 npm run dev
 ```
 
 访问 http://localhost:1421
+
+**常见错误：** 若 `cd simcut/...` 报 `no such file or directory`，说明当前目录不是 everec 仓库根目录，或尚未 checkout simcut 分支。
 
 支持：创建项目、导入视频、预览播放、色彩分析、字幕、静帧、导出项目包（localStorage + IndexedDB 本地存储）
 

@@ -8,6 +8,7 @@ const DB_VERSION = 2;
 interface StoredMedia {
   mimeType: string;
   buffer: ArrayBuffer;
+  fileName?: string;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -29,7 +30,7 @@ export async function saveBlob(id: string, file: File | Blob, fileName?: string)
     file.type || guessMime(fileName ?? (file instanceof File ? file.name : "media.mp4"));
   const buffer = (await file.arrayBuffer()).slice(0);
   cachePreviewUrl(id, new Blob([buffer], { type: mimeType }));
-  const entry: StoredMedia = { mimeType, buffer };
+  const entry: StoredMedia = { mimeType, buffer, fileName: fileName ?? (file instanceof File ? file.name : undefined) };
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
@@ -52,12 +53,17 @@ async function readEntry(id: string): Promise<StoredMedia | null> {
 
   // 兼容旧版：直接存的 Blob/File
   if (raw instanceof Blob) {
-    const mimeType = raw.type || "video/mp4";
-    return { mimeType, buffer: await raw.arrayBuffer() };
+    const mimeType = raw.type || "application/octet-stream";
+    const buffer = (await raw.arrayBuffer()).slice(0);
+    return { mimeType, buffer };
   }
 
   if ("buffer" in raw && "mimeType" in raw) {
-    return raw as StoredMedia;
+    const entry = raw as StoredMedia;
+    return {
+      mimeType: entry.mimeType,
+      buffer: entry.buffer.slice(0),
+    };
   }
 
   return null;
@@ -66,7 +72,11 @@ async function readEntry(id: string): Promise<StoredMedia | null> {
 export async function getBlob(id: string): Promise<Blob | null> {
   const entry = await readEntry(id);
   if (!entry) return null;
-  return new Blob([entry.buffer], { type: entry.mimeType });
+  const mime =
+    entry.mimeType && entry.mimeType !== "application/octet-stream"
+      ? entry.mimeType
+      : guessMime(entry.fileName ?? "media.bin");
+  return new Blob([entry.buffer.slice(0)], { type: mime });
 }
 
 export async function getObjectUrl(id: string): Promise<string | null> {

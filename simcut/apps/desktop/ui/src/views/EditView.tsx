@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Film, Upload } from "lucide-react";
+import { Film, Image, Upload, Video } from "lucide-react";
 import { MediaBin } from "../components/timeline/MediaBin";
 import { Timeline } from "../components/timeline/Timeline";
 import { api } from "../lib/api";
+import { resolvePreviewKind } from "../lib/fonts";
+import { extFromName } from "../lib/mime";
 import { clipAtTime, findMedia } from "../lib/timelineEdit";
 import type { Clip, Project } from "../types";
 
@@ -23,7 +25,6 @@ export function EditView({
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const urlRef = useRef<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewKind, setPreviewKind] = useState<"video" | "image" | null>(null);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
@@ -45,18 +46,23 @@ export function EditView({
 
   const loadPreview = useCallback(async () => {
     if (!previewMedia) {
-      if (urlRef.current) {
-        URL.revokeObjectURL(urlRef.current);
-        urlRef.current = null;
-      }
       setPreviewUrl(null);
       setPreviewKind(null);
       return;
     }
 
     const blobId = previewMedia.blobId ?? previewMedia.id;
-    setLoadError("");
+    const kind = resolvePreviewKind(previewMedia);
+    const ext = extFromName(previewMedia.fileName);
 
+    if ((ext === "heic" || ext === "heif") && kind === "image") {
+      setLoadError("HEIC 格式浏览器不支持，请先转为 JPG/PNG");
+      setPreviewUrl(null);
+      setPreviewKind("image");
+      return;
+    }
+
+    setLoadError("");
     try {
       const url = await api.getMediaUrl({ ...previewMedia, blobId });
       if (!url) {
@@ -64,13 +70,8 @@ export function EditView({
         setPreviewUrl(null);
         return;
       }
-
-      if (urlRef.current && urlRef.current !== url) {
-        URL.revokeObjectURL(urlRef.current);
-      }
-      urlRef.current = url;
       setPreviewUrl(url);
-      setPreviewKind(previewMedia.kind === "image" ? "image" : "video");
+      setPreviewKind(kind);
     } catch (err) {
       setLoadError(String(err));
     }
@@ -81,19 +82,10 @@ export function EditView({
   }, [loadPreview]);
 
   useEffect(() => {
-    return () => {
-      if (urlRef.current) {
-        URL.revokeObjectURL(urlRef.current);
-        urlRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     const video = videoRef.current;
     if (!video || previewKind !== "video") return;
     if (playing) {
-      video.play().catch(() => setLoadError("播放失败，请检查视频编码（推荐 H.264 MP4）"));
+      video.play().catch(() => setLoadError("播放失败，请使用 H.264 MP4"));
     } else {
       video.pause();
     }
@@ -121,19 +113,27 @@ export function EditView({
     );
   };
 
-  const handleImport = async (files: FileList | null) => {
+  const importFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     setImporting(true);
     setMessage("");
     setLoadError("");
+    let current = project;
+    let lastAsset = null;
     try {
-      const { project: updated, asset } = await api.importMediaFile(project, files[0]);
-      onProjectUpdate(updated);
-      setSelectedMediaId(asset.id);
-      const clips0 = updated.tracks[0]?.clips ?? [];
-      const lastClip = clips0[clips0.length - 1];
-      if (lastClip) setSelectedClipId(lastClip.id);
-      setMessage(`已导入: ${files[0].name}`);
+      for (let i = 0; i < files.length; i++) {
+        const result = await api.importMediaFile(current, files[i]);
+        current = result.project;
+        lastAsset = result.asset;
+      }
+      onProjectUpdate(current);
+      if (lastAsset) {
+        setSelectedMediaId(lastAsset.id);
+        const clips0 = current.tracks[0]?.clips ?? [];
+        const lastClip = clips0[clips0.length - 1];
+        if (lastClip) setSelectedClipId(lastClip.id);
+      }
+      setMessage(`已导入 ${files.length} 个素材`);
     } catch (err) {
       setLoadError(String(err));
     } finally {
@@ -166,16 +166,17 @@ export function EditView({
           <span className="text-xs text-sc-muted">
             预览
             {previewMedia
-              ? ` · ${previewMedia.name} (${previewMedia.kind ?? "video"})`
+              ? ` · ${previewMedia.name} (${resolvePreviewKind(previewMedia)})`
               : ""}
           </span>
           <div className="flex items-center gap-2">
             <input
               ref={fileRef}
               type="file"
-              accept="video/*,image/*,audio/*,.mov,.mp4,.m4v,.mkv,.webm"
+              multiple
+              accept="video/*,image/*,.mov,.mp4,.m4v,.mkv,.webm,.jpg,.jpeg,.png,.webp,.gif"
               className="hidden"
-              onChange={(e) => handleImport(e.target.files)}
+              onChange={(e) => importFiles(e.target.files)}
             />
             <button
               type="button"
@@ -200,37 +201,39 @@ export function EditView({
               preload="auto"
               onTimeUpdate={handleTimeUpdate}
               onCanPlay={() => setLoadError("")}
-              onLoadedMetadata={() => {
-                const v = videoRef.current;
-                if (v && !playing) v.currentTime = positionMs / 1000;
-              }}
               onError={() =>
-                setLoadError("视频解码失败。请将素材转为 H.264 MP4（ffmpeg -i in.mov -c:v libx264 out.mp4）")
+                setLoadError("视频解码失败，请转为 H.264 MP4")
               }
               onEnded={() => onPositionChange(activeClip?.startMs ?? 0)}
             />
           ) : previewUrl && previewKind === "image" ? (
             <img
+              key={previewUrl}
               src={previewUrl}
-              alt={previewMedia?.name ?? "素材"}
+              alt={previewMedia?.name ?? "图片素材"}
               className="max-h-full max-w-full object-contain"
-              onError={() => setLoadError("图片加载失败")}
+              onLoad={() => setLoadError("")}
+              onError={() =>
+                setLoadError("图片加载失败，请用 JPG/PNG/WebP 格式")
+              }
             />
+          ) : loadError ? (
+            <div className="px-4 text-center text-xs text-red-300">{loadError}</div>
           ) : (
             <div className="text-center text-sc-muted">
               <Film size={40} className="mx-auto opacity-20" />
-              <p className="mt-2 text-xs">导入视频或图片，或从素材库拖到时间轴</p>
+              <p className="mt-2 text-xs">支持导入图片与视频</p>
+              <div className="mt-2 flex justify-center gap-3 text-[10px]">
+                <span className="flex items-center gap-1"><Video size={10} /> MP4 MOV</span>
+                <span className="flex items-center gap-1"><Image size={10} /> JPG PNG</span>
+              </div>
             </div>
           )}
         </div>
 
-        {(message || loadError) && (
-          <div
-            className={`absolute bottom-2 left-1/2 max-w-[90%] -translate-x-1/2 rounded px-3 py-1 text-[10px] ${
-              loadError ? "bg-red-950/90 text-red-300" : "bg-sc-panel/90 text-sc-muted"
-            }`}
-          >
-            {loadError || message}
+        {message && !loadError && (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-sc-panel/90 px-3 py-1 text-[10px] text-sc-muted">
+            {message}
           </div>
         )}
       </div>

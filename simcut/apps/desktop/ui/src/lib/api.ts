@@ -94,8 +94,11 @@ export const api = {
     const id = crypto.randomUUID();
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "mp4";
     const mimeType = file.type || guessMime(file.name);
-    cachePreviewUrl(id, file);
-    await mediaStore.saveBlob(id, file, file.name);
+    const blob = file.type
+      ? file
+      : new File([file], file.name, { type: mimeType });
+    cachePreviewUrl(id, blob);
+    await mediaStore.saveBlob(id, blob, file.name);
 
     const meta = await mediaStore.probeMedia(file);
     const kind = meta.kind ?? guessKind(file.name, mimeType);
@@ -115,14 +118,16 @@ export const api = {
       kind,
     };
 
+    const isImage = kind === "image";
+    const clipDuration = isImage ? 5000 : meta.durationMs || 5000;
     const clip = {
       id: crypto.randomUUID(),
-      trackIndex: 0,
+      trackIndex: isImage ? 0 : 0,
       mediaId: id,
       startMs: 0,
-      durationMs: meta.durationMs || 5000,
+      durationMs: clipDuration,
       trimInMs: 0,
-      trimOutMs: meta.durationMs || 5000,
+      trimOutMs: clipDuration,
       effectIds: [] as string[],
     };
 

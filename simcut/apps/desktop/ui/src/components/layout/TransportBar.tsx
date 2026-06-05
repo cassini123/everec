@@ -1,5 +1,5 @@
 import { Pause, Play, Square } from "lucide-react";
-import { formatMs } from "../../lib/api";
+import { formatTimecode } from "../../lib/timecode";
 
 interface Props {
   playing: boolean;
@@ -36,7 +36,7 @@ export function TransportBar({
           <Square size={12} />
         </button>
         <span className="ml-2 font-mono text-xs text-sc-muted">
-          {formatMs(positionMs)} / {formatMs(durationMs)}
+          {formatTimecode(positionMs)} / {formatTimecode(durationMs)}
         </span>
       </div>
       <button

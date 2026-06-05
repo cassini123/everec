@@ -1,10 +1,13 @@
+import { guessKind, guessMime } from "./mime";
 import type { Clip, MediaAsset, Project, Track } from "../types";
 
 export function migrateMedia(asset: MediaAsset): MediaAsset {
+  const mimeType = asset.mimeType ?? guessMime(asset.fileName);
   return {
     ...asset,
     blobId: asset.blobId ?? asset.id,
-    kind: asset.kind ?? (asset.format.match(/jpe?g|png|webp|gif|heic/) ? "image" : "video"),
+    mimeType,
+    kind: asset.kind ?? guessKind(asset.fileName, mimeType),
   };
 }
 

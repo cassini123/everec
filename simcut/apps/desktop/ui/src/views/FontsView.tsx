@@ -1,26 +1,13 @@
-import { useState } from "react";
-import { Type } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, Type } from "lucide-react";
+import { FONT_PRESETS, loadWebFonts } from "../lib/fonts";
 import type { FontStyle } from "../types";
-
-/** 10 款代表字体 — 覆盖中文/西文、标题/正文、衬线/无衬线 */
-const FONT_PRESETS = [
-  { id: "pingfang", family: "PingFang SC", label: "苹方", desc: "中文 UI 首选", category: "中文无衬线" },
-  { id: "noto", family: "Noto Sans SC", label: "思源黑体", desc: "跨平台中文", category: "中文无衬线" },
-  { id: "songti", family: "Songti SC", label: "宋体", desc: "文艺衬线", category: "中文衬线" },
-  { id: "kaiti", family: "Kaiti SC", label: "楷体", desc: "手写韵味", category: "中文书法" },
-  { id: "helvetica", family: "Helvetica Neue", label: "Helvetica", desc: "经典西文", category: "西文无衬线" },
-  { id: "georgia", family: "Georgia", label: "Georgia", desc: "阅读衬线", category: "西文衬线" },
-  { id: "avenir", family: "Avenir Next", label: "Avenir", desc: "现代几何", category: "西文标题" },
-  { id: "futura", family: "Futura", label: "Futura", desc: "包豪斯风", category: "西文标题" },
-  { id: "impact", family: "Impact", label: "Impact", desc: "冲击标题", category: "西文强调" },
-  { id: "courier", family: "Courier New", label: "Courier", desc: "等宽字幕", category: "等宽" },
-] as const;
 
 const DEFAULT: FontStyle = {
   id: "default",
-  family: "PingFang SC",
+  family: "Noto Sans SC",
   size: 32,
-  weight: 600,
+  weight: 700,
   color: "#ffffff",
   strokeColor: "#000000",
   strokeWidth: 0,
@@ -28,30 +15,56 @@ const DEFAULT: FontStyle = {
   letterSpacing: 0,
 };
 
-const SAMPLE = "超短篇，轻量出片";
-
 export function FontsView() {
   const [style, setStyle] = useState<FontStyle>(DEFAULT);
+  const [fontsReady, setFontsReady] = useState(false);
+  const [fontError, setFontError] = useState("");
+
+  useEffect(() => {
+    loadWebFonts()
+      .then(() => setFontsReady(true))
+      .catch((err) => setFontError(String(err)));
+  }, []);
 
   const update = <K extends keyof FontStyle>(key: K, value: FontStyle[K]) => {
     setStyle((s) => ({ ...s, [key]: value }));
   };
 
-  const selectFont = (family: string) => update("family", family);
+  const selectFont = (preset: (typeof FONT_PRESETS)[number]) => {
+    setStyle((s) => ({
+      ...s,
+      family: preset.family,
+      weight: preset.weight,
+    }));
+  };
+
+  const activePreset = FONT_PRESETS.find((f) => f.family === style.family);
 
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-auto p-6">
-      <h1 className="flex items-center gap-2 text-lg font-semibold">
-        <Type size={20} />
-        自定义字体 · 10 款代表字体
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="flex items-center gap-2 text-lg font-semibold">
+          <Type size={20} />
+          自定义字体 · 10 款真实 Web 字体
+        </h1>
+        {!fontsReady && !fontError && (
+          <span className="flex items-center gap-1 text-xs text-sc-muted">
+            <Loader2 size={12} className="animate-spin" />
+            加载字体中…
+          </span>
+        )}
+      </div>
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
+      {fontError && (
+        <p className="rounded-lg bg-red-950/40 px-3 py-2 text-xs text-red-300">{fontError}</p>
+      )}
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {FONT_PRESETS.map((font) => (
           <button
             key={font.id}
             type="button"
-            onClick={() => selectFont(font.family)}
+            onClick={() => selectFont(font)}
             className={`rounded-xl border p-3 text-left transition-colors ${
               style.family === font.family
                 ? "border-sc-accent bg-sc-accent/10"
@@ -59,14 +72,18 @@ export function FontsView() {
             }`}
           >
             <div className="text-[10px] text-sc-muted">{font.category}</div>
-            <div className="mt-1 text-sm font-medium">{font.label}</div>
+            <div className="mt-1 text-sm font-medium text-sc-text">{font.label}</div>
             <p
-              className="mt-2 truncate text-base leading-tight"
-              style={{ fontFamily: font.family }}
+              className="mt-2 text-lg leading-snug text-sc-text"
+              style={{
+                fontFamily: `"${font.family}", sans-serif`,
+                fontWeight: font.weight,
+                opacity: fontsReady ? 1 : 0.4,
+              }}
             >
-              {SAMPLE}
+              {font.sample}
             </p>
-            <div className="mt-1 text-[10px] text-sc-muted">{font.desc}</div>
+            <div className="mt-1 font-mono text-[9px] text-sc-muted">{font.family}</div>
           </button>
         ))}
       </div>
@@ -137,21 +154,22 @@ export function FontsView() {
           </label>
         </div>
 
-        <div className="flex flex-1 items-center justify-center rounded-xl border border-sc-border bg-sc-track">
+        <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-sc-border bg-sc-track p-8">
           <p
             style={{
-              fontFamily: style.family,
+              fontFamily: `"${style.family}", sans-serif`,
               fontSize: style.size,
               fontWeight: style.weight,
               color: style.color,
               letterSpacing: style.letterSpacing,
               textShadow: style.shadow ? "0 2px 8px rgba(0,0,0,0.6)" : "none",
-              WebkitTextStroke: style.strokeWidth
-                ? `${style.strokeWidth}px ${style.strokeColor}`
-                : undefined,
+              opacity: fontsReady ? 1 : 0.35,
             }}
           >
-            {SAMPLE}
+            {activePreset?.sample ?? "超短篇，轻量出片"}
+          </p>
+          <p className="mt-4 font-mono text-[10px] text-sc-muted">
+            {style.family} · {style.weight} · Google Fonts
           </p>
         </div>
       </div>

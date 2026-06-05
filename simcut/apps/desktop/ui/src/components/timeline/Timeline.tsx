@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
-import { formatMs } from "../../lib/api";
+import { formatTimecode } from "../../lib/timecode";
 import { findMedia, snapMs } from "../../lib/timelineEdit";
 import type { Clip, Project } from "../../types";
+import { TimecodeRuler } from "./TimecodeRuler";
 
 interface Props {
   project: Project;
@@ -27,6 +28,7 @@ export function Timeline({
   onDropMedia,
   onRemoveClip,
 }: Props) {
+  const fps = project.fps || 30;
   const duration = Math.max(project.durationMs, 10000);
   const trackRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const dragRef = useRef<{
@@ -68,7 +70,7 @@ export function Timeline({
     };
   };
 
-  const handlePointerMove = (e: React.PointerEvent, _trackEl: HTMLDivElement) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     const drag = dragRef.current;
     if (!drag) return;
     const deltaPx = e.clientX - drag.startX;
@@ -107,8 +109,7 @@ export function Timeline({
     setDragOverTrack(null);
     const mediaId = e.dataTransfer.getData("simcut/media-id");
     if (!mediaId) return;
-    const startMs = msFromX(trackEl, e.clientX);
-    onDropMedia(mediaId, trackIndex, startMs);
+    onDropMedia(mediaId, trackIndex, msFromX(trackEl, e.clientX));
   };
 
   const playheadPct = (positionMs / duration) * 100;
@@ -116,6 +117,13 @@ export function Timeline({
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-sc-track">
       <div className="relative min-h-0 flex-1 overflow-auto p-3">
+        <TimecodeRuler
+          durationMs={duration}
+          positionMs={positionMs}
+          fps={fps}
+          onSeek={onSeek}
+        />
+
         {selectedClipId && (
           <div className="mb-2 flex items-center gap-2">
             <button
@@ -140,7 +148,7 @@ export function Timeline({
               ref={(el) => {
                 if (el) trackRefs.current.set(track.index, el);
               }}
-              className={`relative h-12 rounded-md border bg-sc-panel/50 transition-colors ${
+              className={`relative ml-0 h-12 rounded-md border bg-sc-panel/50 transition-colors ${
                 dragOverTrack === track.index
                   ? "border-sc-accent bg-sc-accent/5"
                   : "border-sc-border"
@@ -155,10 +163,7 @@ export function Timeline({
                 const el = trackRefs.current.get(track.index);
                 if (el) handleDrop(e, track.index, el);
               }}
-              onPointerMove={(e) => {
-                const el = trackRefs.current.get(track.index);
-                if (el) handlePointerMove(e, el);
-              }}
+              onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
             >
               {track.clips.map((clip) => {
@@ -180,14 +185,15 @@ export function Timeline({
                     }}
                   >
                     <div
-                      className="flex h-full flex-1 cursor-grab items-center px-1.5 active:cursor-grabbing"
+                      className="flex h-full min-w-0 flex-1 cursor-grab flex-col justify-center px-1.5 active:cursor-grabbing"
                       onPointerDown={(e) => {
                         const el = trackRefs.current.get(track.index);
                         if (el) handlePointerDown(e, clip, "move", el);
                       }}
                     >
-                      <span className="truncate">
-                        {media?.name ?? formatMs(clip.startMs)}
+                      <span className="truncate">{media?.name ?? "片段"}</span>
+                      <span className="font-mono text-[8px] opacity-70">
+                        {formatTimecode(clip.startMs, fps)}
                       </span>
                     </div>
                     <div
@@ -202,7 +208,7 @@ export function Timeline({
               })}
               {track.clips.length === 0 && (
                 <div className="pointer-events-none flex h-full items-center justify-center text-[10px] text-sc-muted">
-                  拖入素材
+                  拖入图片/视频素材
                 </div>
               )}
             </div>
@@ -210,7 +216,7 @@ export function Timeline({
         ))}
 
         <div
-          className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-sc-warm"
+          className="pointer-events-none absolute top-12 bottom-0 z-10 w-0.5 bg-sc-warm"
           style={{ left: `calc(${playheadPct}% + 12px)` }}
         />
       </div>

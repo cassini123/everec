@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pr-bg: #101014;
+  --color-pr-surface: #18181f;
+  --color-pr-panel: #22222a;
+  --color-pr-elevated: #2a2a34;
+  --color-pr-border: #35353f;
+  --color-pr-muted: #8b8b96;
+  --color-pr-text: #ececf0;
+  --color-pr-accent: #7c6cff;
+  --color-pr-accent-dim: #5a4fd4;
+  --color-pr-blue: #4da3ff;
+  --color-pr-green: #3dd68c;
+  --color-pr-orange: #ff9f43;
+  --color-pr-red: #ff6b6b;
+  --font-sans: "SF Pro Text", "Inter", "PingFang SC", system-ui, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-pr-bg);
+  color: var(--color-pr-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #44444d;
+  border-radius: 4px;
+}
+
+.difficulty-1 { color: var(--color-pr-green); }
+.difficulty-2 { color: var(--color-pr-blue); }
+.difficulty-3 { color: var(--color-pr-orange); }
+.difficulty-4 { color: #ff8c42; }
+.difficulty-5 { color: var(--color-pr-red); }
+
+.sync-bar {
+  background: linear-gradient(
+    90deg,
+    var(--color-pr-accent) var(--progress),
+    #333338 var(--progress)
+  );
+}

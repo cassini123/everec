@@ -13,17 +13,13 @@ export const PLATFORM_LABELS: Record<string, string> = {
   bilibili: "Bilibili",
   douyin: "抖音",
   xiaohongshu: "小红书",
+  internet: "互联网",
   itunes: "iTunes",
-  netease: "网易云",
-  qq: "QQ音乐",
-  kugou: "酷狗音乐",
 };
 
 export const MUSIC_SOURCE_LABELS: Record<string, string> = {
+  internet: "互联网音源",
   itunes: "iTunes",
-  netease: "网易云音乐",
-  qq: "QQ音乐",
-  kugou: "酷狗音乐",
 };
 
 export const USER_AGENT =

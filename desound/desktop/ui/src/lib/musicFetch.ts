@@ -1,6 +1,5 @@
 import type { LinkParseResult, MusicSearchResult, SoundAsset } from "../types";
-import { searchMusicOnline } from "@everec/shared";
-import { resolveMusicAudioUrl } from "@everec/shared";
+import { searchMusicOnline, resolveMusicAudioUrl, formatResultLabel } from "@everec/shared";
 import { DESKTOP_APP_HINT, invoke, isTauriApp } from "./tauri";
 
 const USER_AGENT =
@@ -113,64 +112,28 @@ async function importViaHttp(
 
 export async function saveSearchResultToLibrary(result: MusicSearchResult): Promise<SoundAsset> {
   requireDesktop();
-  const displayName = `${result.title} - ${result.artist}`;
+  const displayName = formatResultLabel(result.title, result.artist);
   const tags = ["bgm", "search", result.source];
   const sourceLabel = `search:${result.source}`;
 
   try {
     const resolved = await resolveMusicAudioUrl(result);
     return importViaHttp(resolved.url, displayName, tags, sourceLabel, resolved.referer);
-  } catch {
+  } catch (err) {
     if (result.source === "itunes" && result.previewUrl) {
       return importViaHttp(result.previewUrl, displayName, tags, sourceLabel);
     }
+    const bvid = result.playBvid ?? result.id.replace(/^internet:/, "");
+    if (bvid) {
+      return invoke<SoundAsset>("download_media_with_ytdlp", {
+        url: `https://www.bilibili.com/video/${bvid}`,
+        name: displayName,
+        tags,
+        sourceLabel,
+      });
+    }
+    throw err;
   }
-
-  if (result.source === "netease") {
-    const songId = result.id.replace("netease:", "");
-    return invoke<SoundAsset>("download_media_with_ytdlp", {
-      url: `https://music.163.com/#/song?id=${songId}`,
-      name: displayName,
-      tags,
-      sourceLabel,
-    });
-  }
-
-  if (result.source === "qq") {
-    const parts = result.id.split(":");
-    const mid = parts[2];
-    const pageUrl = mid
-      ? `https://y.qq.com/n/ryqq/song/${mid}.html`
-      : `https://y.qq.com/n/ryqq/song/${parts[1]}.html`;
-    return invoke<SoundAsset>("download_media_with_ytdlp", {
-      url: pageUrl,
-      name: displayName,
-      tags,
-      sourceLabel,
-    });
-  }
-
-  if (result.source === "kugou") {
-    const hash = result.id.split(":")[1];
-    return invoke<SoundAsset>("download_media_with_ytdlp", {
-      url: `https://www.kugou.com/song/#hash=${hash}`,
-      name: displayName,
-      tags,
-      sourceLabel,
-    });
-  }
-
-  if (result.source === "bilibili") {
-    const bvid = result.id.replace("bilibili:", "");
-    return invoke<SoundAsset>("download_media_with_ytdlp", {
-      url: `https://www.bilibili.com/video/${bvid}`,
-      name: displayName,
-      tags,
-      sourceLabel,
-    });
-  }
-
-  throw new Error("该歌曲暂无可用音频");
 }
 
 export async function saveLinkToLibrary(link: LinkParseResult): Promise<SoundAsset> {

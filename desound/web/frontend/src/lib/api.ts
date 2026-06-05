@@ -82,6 +82,7 @@ export const api = {
       source: result.source,
     });
     if (result.playBvid) params.set("playBvid", result.playBvid);
+    else if (result.source === "internet") params.set("playBvid", result.id.replace("internet:", ""));
     else if (result.source === "bilibili") params.set("playBvid", result.id.replace("bilibili:", ""));
     return `${API}/search/play?${params.toString()}`;
   },

@@ -23,6 +23,7 @@ import {
   saveSearchResultToLibrary,
   searchMusicOnline,
 } from "../lib/musicFetch";
+import { formatResultLabel } from "@everec/shared";
 import type { LinkParseResult, MusicSearchResult, SoundAsset } from "../types";
 
 interface LibraryViewProps {
@@ -48,11 +49,6 @@ const platformLabels: Record<string, string> = {
   bilibili: "Bilibili",
   douyin: "抖音",
   xiaohongshu: "小红书",
-  itunes: "iTunes",
-  netease: "网易云",
-  bilibili: "Bilibili",
-  qq: "QQ音乐",
-  kugou: "酷狗音乐",
 };
 
 function formatDuration(ms: number): string {
@@ -380,7 +376,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
               </button>
             </div>
             <p className="px-4 pb-2 text-[11px] text-ds-muted">
-              同时搜索 iTunes、网易云音乐、QQ音乐、酷狗音乐
+              搜索互联网音源（自动解析）与 iTunes，每首歌仅展示一条结果
             </p>
 
             <div className="flex-1 overflow-auto p-4">
@@ -388,7 +384,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
                 <div className="flex h-full flex-col items-center justify-center gap-3 text-ds-muted">
                   <Globe className="h-12 w-12 opacity-30" />
                   <p className="text-sm">输入关键词搜索歌曲，保存至素材库</p>
-                  <p className="text-xs opacity-60">支持网易云音乐、iTunes 曲库</p>
+                  <p className="text-xs opacity-60">支持歌名、歌手或「歌手 歌名」</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -409,14 +405,16 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{result.title}</div>
-                        <div className="truncate text-xs text-ds-muted">
-                          {result.artist}
-                          {result.album ? ` · ${result.album}` : ""}
+                        <div className="truncate text-sm font-medium">
+                          {formatResultLabel(result.title, result.artist)}
                         </div>
-                        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-ds-muted">
-                          <span>{platformLabels[result.source] ?? result.source}</span>
-                          <span>{formatDuration(result.durationMs)}</span>
+                        <div className="truncate text-xs text-ds-muted">
+                          {result.album ? (
+                            <span className="text-ds-text/80">{result.album}</span>
+                          ) : (
+                            <span>单曲</span>
+                          )}
+                          <span> · {formatDuration(result.durationMs)}</span>
                         </div>
                       </div>
                       <button

@@ -13,6 +13,7 @@ interface MasterOverviewProps {
   playing: boolean;
   selectedTrack: number;
   onSelectTrack: (index: number) => void;
+  onPositionChange?: (beat: number) => void;
 }
 
 export function MasterOverview({
@@ -23,6 +24,7 @@ export function MasterOverview({
   playing,
   selectedTrack,
   onSelectTrack,
+  onPositionChange,
 }: MasterOverviewProps) {
   const width = beats * BEAT_WIDTH;
 
@@ -62,7 +64,15 @@ export function MasterOverview({
           ))}
         </div>
 
-        <div className="relative min-w-0 flex-1 overflow-x-auto">
+        <div
+          className="relative min-w-0 flex-1 overflow-x-auto"
+          onClick={(e) => {
+            if (!onPositionChange) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
+            onPositionChange(Math.floor(x / BEAT_WIDTH));
+          }}
+        >
           <div className="relative" style={{ width, height: tracks.length * LANE_HEIGHT }}>
             {tracks.map((track, i) => (
               <div
@@ -99,12 +109,10 @@ export function MasterOverview({
                   ))}
               </div>
             ))}
-            {playing && (
-              <div
-                className="pointer-events-none absolute top-0 z-10 h-full w-px bg-ds-accent"
-                style={{ left: position * BEAT_WIDTH + BEAT_WIDTH / 2 }}
-              />
-            )}
+            <div
+              className="pointer-events-none absolute top-0 z-10 h-full w-px bg-ds-accent shadow-[0_0_6px_var(--color-ds-accent)]"
+              style={{ left: position * BEAT_WIDTH + BEAT_WIDTH / 2 }}
+            />
           </div>
         </div>
       </div>

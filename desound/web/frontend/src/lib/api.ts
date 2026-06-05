@@ -8,7 +8,7 @@ import type {
   SoundDesignResult,
   TrackInfo,
 } from "@everec/shared";
-import { WEB_INSTRUMENTS } from "@everec/shared";
+import { WEB_INSTRUMENTS, type WebInstrumentSlug } from "@everec/shared";
 import {
   initWebAudio,
   playWebNote,
@@ -83,10 +83,15 @@ export const api = {
 
   setTrackLoudness: async (): Promise<void> => Promise.resolve(),
 
-  noteOn: async (track: number, note: number, velocity = 0.85): Promise<void> => {
+  noteOn: async (
+    track: number,
+    note: number,
+    velocity = 0.85,
+    durationSec?: number,
+  ): Promise<void> => {
     await initWebAudio();
-    const inst = webTracks[track]?.instrument ?? "grand_piano";
-    playWebNote(track, note, velocity, inst as "grand_piano");
+    const inst = (webTracks[track]?.instrument ?? "grand_piano") as WebInstrumentSlug;
+    playWebNote(track, note, velocity, inst, durationSec);
   },
 
   noteOff: async (track: number, note: number): Promise<void> => {

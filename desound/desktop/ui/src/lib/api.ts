@@ -45,7 +45,12 @@ export const api = {
       ? invoke("set_track_loudness", { track, gainDb })
       : Promise.resolve(),
 
-  noteOn: (track: number, note: number, velocity: number): Promise<void> =>
+  noteOn: (
+    track: number,
+    note: number,
+    velocity: number,
+    _durationSec?: number,
+  ): Promise<void> =>
     isTauriApp()
       ? invoke("note_on", { track, note, velocity })
       : Promise.resolve(),

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, Plus } from "lucide-react";
-import { api } from "../lib/api";
+import { api, beatToSec } from "../lib/api";
 import { InstrumentPicker } from "../components/compose/InstrumentPicker";
 import { NotePickerModal } from "../components/compose/NotePickerModal";
 import { PianoRoll, type GridPick } from "../components/compose/PianoRoll";
 import { MasterOverview } from "../components/compose/MasterOverview";
+import { ComposeTimeline } from "../components/compose/ComposeTimeline";
 import { TrackList } from "../components/compose/TrackList";
 import type { InstrumentInfo, NoteClip, TrackInfo } from "../types";
 
@@ -17,6 +18,7 @@ interface ComposeViewProps {
   bpm: number;
   position: number;
   playing: boolean;
+  onPositionChange: (beat: number) => void;
   onTracksChange: () => void;
   onExport: () => void;
 }
@@ -27,6 +29,7 @@ export function ComposeView({
   bpm,
   position,
   playing,
+  onPositionChange,
   onTracksChange,
   onExport,
 }: ComposeViewProps) {
@@ -36,25 +39,30 @@ export function ComposeView({
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set());
   const [lastPlayedBeat, setLastPlayedBeat] = useState(-1);
   const [picker, setPicker] = useState<GridPick | null>(null);
+  const noteOffTimers = useRef<Map<string, number>>(new Map());
+
+  const beatDurationSec = 60 / bpm;
 
   const playNote = useCallback(
-    async (track: number, note: number, velocity = 0.85) => {
+    async (track: number, note: number, velocity = 0.85, durationBeats = 1) => {
       try {
-        await api.noteOn(track, note, velocity);
+        await api.noteOn(track, note, velocity, durationBeats * beatDurationSec);
         setActiveNotes((prev) => new Set(prev).add(note));
-        window.setTimeout(() => {
+        const timerId = window.setTimeout(() => {
           api.noteOff(track, note);
           setActiveNotes((prev) => {
             const next = new Set(prev);
             next.delete(note);
             return next;
           });
-        }, 300);
+          noteOffTimers.current.delete(`${track}:${note}`);
+        }, durationBeats * beatDurationSec * 1000);
+        noteOffTimers.current.set(`${track}:${note}`, timerId);
       } catch {
         /* audio unavailable */
       }
     },
-    [],
+    [beatDurationSec],
   );
 
   useEffect(() => {
@@ -69,10 +77,29 @@ export function ComposeView({
     clips
       .filter((c) => Math.floor(c.startBeat) === beat)
       .forEach((clip) => {
-        api.noteOn(clip.track, clip.note, clip.velocity);
-        window.setTimeout(() => api.noteOff(clip.track, clip.note), 220);
+        const durationSec = clip.durationBeats * beatDurationSec;
+        api.noteOn(clip.track, clip.note, clip.velocity, durationSec);
+        const key = `${clip.track}:${clip.note}:${clip.id}`;
+        const existing = noteOffTimers.current.get(key);
+        if (existing) window.clearTimeout(existing);
+        const timerId = window.setTimeout(
+          () => {
+            api.noteOff(clip.track, clip.note);
+            noteOffTimers.current.delete(key);
+          },
+          durationSec * 1000,
+        );
+        noteOffTimers.current.set(key, timerId);
       });
-  }, [playing, position, clips, lastPlayedBeat]);
+  }, [playing, position, clips, lastPlayedBeat, beatDurationSec]);
+
+  useEffect(
+    () => () => {
+      for (const id of noteOffTimers.current.values()) window.clearTimeout(id);
+      noteOffTimers.current.clear();
+    },
+    [],
+  );
 
   const addClip = useCallback(
     (note: number, beat: number, track = selectedTrack) => {
@@ -165,7 +192,7 @@ export function ComposeView({
           添加轨道
         </button>
         <span className="text-xs text-ds-muted">
-          {clips.length} 个音符 · {bpm} BPM
+          {clips.length} 个音符 · {bpm} BPM · {beatToSec(TOTAL_BEATS, bpm).toFixed(1)}s
         </span>
         <button
           type="button"
@@ -177,6 +204,14 @@ export function ComposeView({
         </button>
       </div>
 
+      <ComposeTimeline
+        beats={TOTAL_BEATS}
+        bpm={bpm}
+        position={position}
+        playing={playing}
+        onPositionChange={onPositionChange}
+      />
+
       <MasterOverview
         tracks={tracks}
         clips={clips}
@@ -185,6 +220,7 @@ export function ComposeView({
         playing={playing}
         selectedTrack={selectedTrack}
         onSelectTrack={setSelectedTrack}
+        onPositionChange={onPositionChange}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -209,6 +245,7 @@ export function ComposeView({
           onDeleteClip={deleteClip}
           onOpenPicker={setPicker}
           onPreviewNote={(note) => playNote(selectedTrack, note)}
+          onPositionChange={onPositionChange}
         />
       </div>
 

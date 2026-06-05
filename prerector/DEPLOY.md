@@ -28,6 +28,7 @@ npm run build:vercel-prerector
 ## 说明
 
 - 前端：`prerector/web/frontend/dist`
-- API：`prerector/api/index.js`（构建自 Hono backend）
+- API：`prerector/api/index.js`（部署时由 `build:vercel-prerector-api` 生成，不提交到 Git）
+- `vercel.json` 使用 `framework: null`（与 `knowgo/` 相同），避免 Vite 把 `/api` 当作静态资源返回 JS 源码
 - Demo 用户：请求头 `X-User-Id: user-me`（前端自动设置）
 - Vercel 上数据存 `/tmp/everec-prerector`（无持久化，重启后重置为 seed 数据）

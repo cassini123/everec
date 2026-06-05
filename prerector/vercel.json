@@ -3,7 +3,7 @@
   "installCommand": "cd .. && npm install",
   "buildCommand": "cd .. && npm run build:vercel-prerector",
   "outputDirectory": "web/frontend/dist",
-  "framework": "vite",
+  "framework": null,
   "functions": {
     "api/**": {
       "memory": 1024,

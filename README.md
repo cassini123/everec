@@ -9,18 +9,27 @@
 
 ## Simcut Web（Vercel 在线版）
 
-仓库已配置 Vercel 直接部署 Simcut 网页端：
+独立网页端路径：`simcut/web/frontend`
 
-- **构建目录**：`simcut/apps/desktop/ui`
-- **输出目录**：`simcut/apps/desktop/ui/dist`
-- 连接 Vercel 后选择 `main` 分支，推送即自动部署
+Vercel 已配置为自动构建部署：
+
+- **安装**：`npm install --prefix simcut/web/frontend`
+- **构建**：`npm run build --prefix simcut/web/frontend`
+- **输出**：`simcut/web/frontend/dist`
+- 在 [vercel.com](https://vercel.com) 导入 `cassini123/everec`，选 `main` 分支即可
 
 ### 本地开发 Simcut Web
 
 ```bash
-cd simcut/apps/desktop/ui
+cd simcut/web/frontend
 npm install
 npm run dev
+```
+
+或在仓库根目录：
+
+```bash
+npm run dev:simcut
 ```
 
 浏览器打开 http://localhost:1421（端口占用时自动换 1422 等）

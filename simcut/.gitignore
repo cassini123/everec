@@ -6,3 +6,5 @@ dist/
 apps/desktop/ui/dist/
 apps/desktop/ui/.vite/
 apps/desktop/gen/
+web/frontend/dist/
+web/frontend/node_modules/

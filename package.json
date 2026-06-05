@@ -6,14 +6,15 @@
     "shared",
     "desound/web/frontend",
     "desound/web/backend",
-    "desound/desktop/ui"
+    "desound/desktop/ui",
+    "simcut/web/frontend"
   ],
   "scripts": {
     "dev:web": "npm run dev --workspace=@everec/web-backend & npm run dev --workspace=@everec/web-frontend",
-    "dev:simcut": "npm run dev --prefix simcut/apps/desktop/ui",
+    "dev:simcut": "npm run dev --workspace=@simcut/web-frontend",
     "dev:desktop": "npm run dev --prefix desound/desktop",
     "build:web": "npm run build --workspace=@everec/web-frontend",
-    "build:simcut": "npm run build --prefix simcut/apps/desktop/ui",
+    "build:simcut": "npm run build --workspace=@simcut/web-frontend",
     "build:vercel-api": "node api/scripts/build-vercel-api.mjs",
     "build:vercel": "npm run build:simcut",
     "build:desktop": "npm run ui:build --prefix desound/desktop"

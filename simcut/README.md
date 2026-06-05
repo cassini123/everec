@@ -14,10 +14,12 @@
 - AI 解析
 - 导出渲染
 
-## Web 端（浏览器直接用）
+## Web 端（浏览器 / Vercel）
+
+独立网页端：
 
 ```bash
-cd simcut/apps/desktop/ui
+cd simcut/web/frontend
 npm install
 npm run dev
 ```
@@ -26,7 +28,9 @@ npm run dev
 
 支持：创建项目、导入视频/图片、预览播放、色彩分析、字幕、静帧、本地存储（localStorage + IndexedDB）
 
-**Vercel 部署**：仓库根目录 `vercel.json` 已指向本目录，推送 `main` 分支即可在线访问。
+**Vercel 部署**：根目录 `vercel.json` 指向 `simcut/web/frontend`，推送 `main` 分支自动上线。
+
+桌面 UI 源码在 `simcut/apps/desktop/ui`（含 Tauri 集成）。
 
 ## 桌面端
 

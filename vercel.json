@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install --prefix simcut/apps/desktop/ui",
-  "buildCommand": "npm run build --prefix simcut/apps/desktop/ui",
-  "outputDirectory": "simcut/apps/desktop/ui/dist",
+  "installCommand": "npm install --prefix simcut/web/frontend",
+  "buildCommand": "npm run build --prefix simcut/web/frontend",
+  "outputDirectory": "simcut/web/frontend/dist",
   "framework": "vite",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }

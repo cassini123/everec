@@ -17,7 +17,9 @@
     "build:web": "npm run build --workspace=@everec/web-frontend",
     "build:prerector": "npm run build --workspace=@everec/prerector-frontend",
     "build:vercel-api": "node api/scripts/build-vercel-api.mjs",
+    "build:vercel-prerector-api": "node prerector/api/scripts/build-vercel-api.mjs",
     "build:vercel": "npm run build:vercel-api && npm run build:web",
+    "build:vercel-prerector": "npm run build:vercel-prerector-api && npm run build --workspace=@everec/prerector-frontend",
     "build:desktop": "npm run ui:build --prefix desound/desktop"
   },
   "dependencies": {

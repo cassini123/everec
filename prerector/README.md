@@ -38,6 +38,17 @@ npm run dev:prerector
 
 浏览器打开 http://localhost:1421
 
+## Vercel 部署（独立 Web 端）
+
+在 Vercel 新建项目，**Root Directory** 设为 `prerector`（使用本目录下的 `vercel.json`）。
+
+```bash
+# 本地验证 Vercel 构建
+npm run build:vercel-prerector
+```
+
+与 desound（仓库根目录部署）分离，可单独获得预览 URL，例如 `https://<your-project>.vercel.app`。
+
 ## API 概览
 
 | 路由 | 方法 | 功能 |

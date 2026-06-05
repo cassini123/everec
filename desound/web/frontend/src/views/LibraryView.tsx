@@ -435,7 +435,7 @@ export function LibraryView({
               </button>
             </div>
             <p className="px-4 pb-2 text-[11px] text-ds-muted">
-              仅 iTunes 曲库，展示专辑封面与曲目信息
+              聚合 iTunes 曲库与 Bilibili 公开音频，展示封面与曲目信息
             </p>
 
             <div className="flex-1 overflow-auto p-4">
@@ -467,8 +467,13 @@ export function LibraryView({
                         <div className="truncate text-sm font-medium text-ds-text/90">
                           {result.album}
                         </div>
-                        <div className="truncate text-xs text-ds-muted">
-                          {formatResultLabel(result.title, result.artist)}
+                        <div className="flex min-w-0 items-center gap-2 text-xs text-ds-muted">
+                          <span className="truncate">
+                            {formatResultLabel(result.title, result.artist)}
+                          </span>
+                          <span className="shrink-0 rounded bg-ds-elevated px-1.5 py-0.5 text-[10px] uppercase">
+                            {result.source}
+                          </span>
                           <span> · {formatDurationMs(result.durationMs)}</span>
                         </div>
                       </div>

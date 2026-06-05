@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import type { LinkParseResult, MusicSearchResult } from "../types";
+import { invoke, isTauriApp } from "./tauri";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -172,6 +172,9 @@ export async function parseMediaUrl(url: string): Promise<LinkParseResult> {
 }
 
 export async function saveSearchResultToLibrary(result: MusicSearchResult): Promise<void> {
+  if (!isTauriApp()) {
+    throw new Error("保存至素材库需使用 Tauri 桌面应用");
+  }
   const displayName = `${result.title} - ${result.artist}`;
   const tags = ["bgm", "search", result.source];
 
@@ -204,6 +207,9 @@ export async function saveSearchResultToLibrary(result: MusicSearchResult): Prom
 }
 
 export async function saveLinkToLibrary(link: LinkParseResult): Promise<void> {
+  if (!isTauriApp()) {
+    throw new Error("保存至素材库需使用 Tauri 桌面应用");
+  }
   const tags = ["bgm", link.platform];
   const sourceLabel = `link:${link.platform}`;
 

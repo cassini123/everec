@@ -93,6 +93,10 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
   });
 
   const handleUploadBgm = async () => {
+    if (!api.isDesktop()) {
+      setStatusMsg("浏览器预览模式不支持上传，请使用 Tauri 桌面应用");
+      return;
+    }
     const path = await open({
       multiple: false,
       filters: [

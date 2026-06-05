@@ -1,6 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
 import type { SoundDesignResult } from "../types";
 import { extractKeywordsLocal, matchStyles } from "./styles";
+import { invoke, isTauriApp } from "./tauri";
 
 const API_KEY_STORAGE = "desound_openai_key";
 
@@ -77,13 +77,16 @@ export async function analyzeSoundDesign(
     }
   }
 
-  try {
-    return await invoke<SoundDesignResult>("analyze_sound_design", {
-      description,
-    });
-  } catch {
-    const keywords = extractKeywordsLocal(description);
-    return {
+  if (isTauriApp()) {
+    try {
+      return await invoke<SoundDesignResult>("analyze_sound_design", { description });
+    } catch {
+      /* fall through to local */
+    }
+  }
+
+  const keywords = extractKeywordsLocal(description);
+  return {
       keywords,
       mood: keywords.includes("恐怖") || keywords.includes("horror")
         ? "tense / dark"
@@ -98,5 +101,4 @@ export async function analyzeSoundDesign(
       ],
       source: "local",
     };
-  }
 }

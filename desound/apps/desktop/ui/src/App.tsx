@@ -77,7 +77,12 @@ export default function App() {
         await refreshLibrary();
         setReady(true);
       } catch (err) {
-        setInitError(String(err));
+        const msg = String(err);
+        if (msg.includes("TAURI_UNAVAILABLE")) {
+          setInitError("");
+        } else {
+          setInitError(msg);
+        }
         setReady(true);
       }
     })();
@@ -191,6 +196,12 @@ export default function App() {
       {initError && (
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded bg-red-950/90 px-4 py-2 text-xs text-red-300">
           音频初始化: {initError}
+        </div>
+      )}
+
+      {ready && !api.isDesktop() && (
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded bg-amber-950/90 px-4 py-2 text-xs text-amber-200">
+          浏览器预览模式 — 音频与素材库功能需通过 Tauri 桌面应用运行
         </div>
       )}
     </div>

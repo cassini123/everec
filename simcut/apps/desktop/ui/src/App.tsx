@@ -5,15 +5,14 @@ import { TransportBar } from "./components/layout/TransportBar";
 import { ExportDialog } from "./components/export/ExportDialog";
 import { ProjectsView } from "./views/ProjectsView";
 import { EditView } from "./views/EditView";
-import { SubtitlesView } from "./views/SubtitlesView";
+import { TextView } from "./views/TextView";
 import { ColorView } from "./views/ColorView";
 import { StillsView } from "./views/StillsView";
 import { EffectsView } from "./views/EffectsView";
-import { FontsView } from "./views/FontsView";
 import { AiView } from "./views/AiView";
 import { api } from "./lib/api";
 import { timelineExtentMs } from "./lib/timelineLayout";
-import type { Project, ProjectSummary, Workspace } from "./types";
+import type { Project, ProjectSummary, TextTab, Workspace } from "./types";
 
 const SEEK_STEP_MS = 500;
 
@@ -25,6 +24,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 export default function App() {
   const [workspace, setWorkspace] = useState<Workspace>("projects");
+  const [textTab, setTextTab] = useState<TextTab>("subtitles");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -112,7 +112,12 @@ export default function App() {
     <div className="flex h-full flex-col overflow-hidden bg-sc-bg">
       <TopBar project={project} />
       <div className="flex min-h-0 flex-1">
-        <Sidebar workspace={workspace} onChange={setWorkspace} />
+        <Sidebar
+          workspace={workspace}
+          textTab={textTab}
+          onChange={setWorkspace}
+          onTextTabChange={setTextTab}
+        />
         <main className="flex min-w-0 flex-1 flex-col">
           {!ready ? (
             <div className="flex flex-1 items-center justify-center text-sc-muted">
@@ -143,8 +148,13 @@ export default function App() {
               onProjectUpdate={updateProject}
               onPositionChange={setPositionMs}
             />
-          ) : workspace === "subtitles" ? (
-            <SubtitlesView project={project} onUpdate={updateProject} />
+          ) : workspace === "text" ? (
+            <TextView
+              project={project}
+              tab={textTab}
+              onTabChange={setTextTab}
+              onUpdate={updateProject}
+            />
           ) : workspace === "color" ? (
             <ColorView
               project={project}
@@ -159,8 +169,6 @@ export default function App() {
             />
           ) : workspace === "effects" ? (
             <EffectsView activeEffects={activeEffects} onToggle={handleToggleEffect} />
-          ) : workspace === "fonts" ? (
-            <FontsView />
           ) : workspace === "ai" ? (
             <AiView projectName={project.name} />
           ) : null}

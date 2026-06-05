@@ -1,12 +1,14 @@
 export type Workspace =
   | "projects"
   | "edit"
-  | "subtitles"
+  | "text"
   | "color"
   | "stills"
   | "effects"
-  | "fonts"
   | "ai";
+
+/** 文字模块二级分类 */
+export type TextTab = "subtitles" | "fonts" | "design";
 
 export interface ProjectSummary {
   id: string;

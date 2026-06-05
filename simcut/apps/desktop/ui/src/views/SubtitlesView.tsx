@@ -13,9 +13,10 @@ const LANGUAGES = [
 interface Props {
   project: Project;
   onUpdate: (project: Project) => void | Promise<void>;
+  embedded?: boolean;
 }
 
-export function SubtitlesView({ project, onUpdate }: Props) {
+export function SubtitlesView({ project, onUpdate, embedded }: Props) {
   const [language, setLanguage] = useState("zh");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -42,11 +43,18 @@ export function SubtitlesView({ project, onUpdate }: Props) {
     <div className="flex flex-1 flex-col p-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold">
-            <Languages size={20} />
-            多语言自动字幕
-          </h1>
-          <p className="mt-1 text-sm text-sc-muted">自动识别语音并生成多语言字幕轨道</p>
+          {!embedded && (
+            <>
+              <h1 className="flex items-center gap-2 text-lg font-semibold">
+                <Languages size={20} />
+                多语言自动字幕
+              </h1>
+              <p className="mt-1 text-sm text-sc-muted">自动识别语音并生成多语言字幕轨道</p>
+            </>
+          )}
+          {embedded && (
+            <p className="text-sm text-sc-muted">自动识别语音并生成多语言字幕轨道</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <select

@@ -15,7 +15,11 @@ const DEFAULT: FontStyle = {
   letterSpacing: 0,
 };
 
-export function FontsView() {
+interface Props {
+  embedded?: boolean;
+}
+
+export function FontsView({ embedded = false }: Props) {
   const [style, setStyle] = useState<FontStyle>(DEFAULT);
   const [fontsReady, setFontsReady] = useState(false);
   const [fontError, setFontError] = useState("");
@@ -43,10 +47,14 @@ export function FontsView() {
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-auto p-6">
       <div className="flex items-center justify-between">
-        <h1 className="flex items-center gap-2 text-lg font-semibold">
-          <Type size={20} />
-          自定义字体 · 10 款真实 Web 字体
-        </h1>
+        {embedded ? (
+          <p className="text-sm text-sc-muted">10 款真实 Web 字体，可调字号、字重与颜色</p>
+        ) : (
+          <h1 className="flex items-center gap-2 text-lg font-semibold">
+            <Type size={20} />
+            自定义字体 · 10 款真实 Web 字体
+          </h1>
+        )}
         {!fontsReady && !fontError && (
           <span className="flex items-center gap-1 text-xs text-sc-muted">
             <Loader2 size={12} className="animate-spin" />

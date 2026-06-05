@@ -23,16 +23,7 @@
 
 ## 快速开始
 
-### 桌面端（完整功能）
-
-```bash
-cd simcut/apps/desktop
-npm install
-npm install --prefix ui
-npm run dev
-```
-
-### 仅前端（网页预览）
+### 网页端（推荐先体验）
 
 ```bash
 cd simcut/apps/desktop/ui
@@ -41,6 +32,19 @@ npm run dev
 ```
 
 访问 http://localhost:1421
+
+支持：创建项目、导入视频、预览播放、色彩分析、字幕、静帧、导出项目包（localStorage + IndexedDB 本地存储）
+
+### 桌面端（完整渲染 + 相册/网盘）
+
+```bash
+cd simcut/apps/desktop
+npm install
+npm install --prefix ui
+npm run dev
+```
+
+需要 Rust ≥ 1.85 和 FFmpeg
 
 ### Rust 构建
 

@@ -26,6 +26,8 @@ export interface MediaAsset {
   height: number;
   tags: string[];
   createdAt: string;
+  /** Web 端 IndexedDB blob 引用 */
+  blobId?: string;
 }
 
 export interface Clip {

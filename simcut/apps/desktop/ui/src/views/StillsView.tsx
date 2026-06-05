@@ -6,7 +6,7 @@ import type { Project } from "../types";
 interface Props {
   project: Project;
   positionMs: number;
-  onUpdate: (project: Project) => void;
+  onUpdate: (project: Project) => void | Promise<void>;
 }
 
 export function StillsView({ project, positionMs, onUpdate }: Props) {
@@ -28,7 +28,7 @@ export function StillsView({ project, positionMs, onUpdate }: Props) {
         ["静帧"],
         ["#5b8def", "#f59e6c", "#3dd68c"],
       );
-      onUpdate({ ...project, stills: [...project.stills, still] });
+      await onUpdate({ ...project, stills: [...project.stills, still] });
       setLabel("");
       setMessage("静帧已保存");
     } catch (err) {

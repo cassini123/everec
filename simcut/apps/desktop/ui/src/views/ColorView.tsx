@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Palette, Upload } from "lucide-react";
 import { api } from "../lib/api";
 import type { ColorAnalysisResult } from "../types";
@@ -8,33 +8,35 @@ interface Props {
 }
 
 export function ColorView({ onApplyLut }: Props) {
+  const fileRef = useRef<HTMLInputElement>(null);
   const [analysis, setAnalysis] = useState<ColorAnalysisResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
-  const handleUpload = async () => {
-    if (!api.isDesktop()) {
-      setAnalysis(mockColorAnalysis());
-      setMessage("网页预览模式 — 展示色彩分析示例");
-      return;
-    }
-
+  const handleFile = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setBusy(true);
+    setMessage("");
     try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: "Image", extensions: ["jpg", "jpeg", "png", "webp"] }],
-      });
-      if (!selected || Array.isArray(selected)) return;
-
-      setBusy(true);
-      const result = await api.analyzeColorFromPhoto(selected);
-      setAnalysis(result);
+      if (api.isDesktop()) {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({
+          multiple: false,
+          filters: [{ name: "Image", extensions: ["jpg", "jpeg", "png", "webp"] }],
+        });
+        if (!selected || Array.isArray(selected)) return;
+        const result = await api.analyzeColorFromPhoto(selected);
+        setAnalysis(result);
+      } else {
+        const result = await api.analyzeColorFromFile(files[0]);
+        setAnalysis(result);
+      }
       setMessage("色彩系统已解析");
     } catch (err) {
       setMessage(String(err));
     } finally {
       setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
@@ -64,15 +66,30 @@ export function ColorView({ onApplyLut }: Props) {
             上传参考照片，识别色彩系统并生成自适应 LUT
           </p>
         </div>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={handleUpload}
-          className="flex items-center gap-2 rounded-lg bg-sc-accent px-4 py-2 text-sm text-white hover:bg-sc-accent-dim disabled:opacity-50"
-        >
-          <Upload size={14} />
-          {busy ? "分析中…" : "上传参考图"}
-        </button>
+        <div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleFile(e.target.files)}
+          />
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              if (api.isDesktop()) {
+                handleFile(null);
+              } else {
+                fileRef.current?.click();
+              }
+            }}
+            className="flex items-center gap-2 rounded-lg bg-sc-accent px-4 py-2 text-sm text-white hover:bg-sc-accent-dim disabled:opacity-50"
+          >
+            <Upload size={14} />
+            {busy ? "分析中…" : "上传参考图"}
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -126,39 +143,4 @@ export function ColorView({ onApplyLut }: Props) {
       )}
     </div>
   );
-}
-
-function mockColorAnalysis(): ColorAnalysisResult {
-  return {
-    dominantColors: [
-      { hex: "#c47a5a", weight: 0.35, label: "暖色" },
-      { hex: "#3d4f6f", weight: 0.25, label: "冷色" },
-      { hex: "#f0e6d8", weight: 0.2, label: "高光" },
-      { hex: "#1a1a22", weight: 0.15, label: "暗部" },
-      { hex: "#8b9a6b", weight: 0.05, label: "自然" },
-    ],
-    colorSystem: {
-      name: "暖调电影感",
-      description: "色温 5800K 倾向，对比度 42%，饱和度 38%",
-      palette: [],
-      temperature: 0.2,
-      contrast: 0.42,
-      saturation: 0.38,
-    },
-    suggestedLut: {
-      id: "lut-preview",
-      name: "暖调电影感 自适应 LUT",
-      source: "photo-analysis",
-      colorSystem: {
-        name: "暖调电影感",
-        description: "",
-        palette: [],
-        temperature: 0.2,
-        contrast: 0.42,
-        saturation: 0.38,
-      },
-      lutCube: "",
-    },
-    moodTags: ["温暖", "电影", "文艺"],
-  };
 }

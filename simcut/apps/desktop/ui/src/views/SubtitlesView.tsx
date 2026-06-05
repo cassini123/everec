@@ -12,7 +12,7 @@ const LANGUAGES = [
 
 interface Props {
   project: Project;
-  onUpdate: (project: Project) => void;
+  onUpdate: (project: Project) => void | Promise<void>;
 }
 
 export function SubtitlesView({ project, onUpdate }: Props) {
@@ -29,7 +29,7 @@ export function SubtitlesView({ project, onUpdate }: Props) {
         language,
         project.media[0]?.id,
       );
-      onUpdate({ ...project, subtitles: [...project.subtitles, ...cues] });
+      await onUpdate({ ...project, subtitles: [...project.subtitles, ...cues] });
       setMessage(`已识别 ${cues.length} 条字幕`);
     } catch (err) {
       setMessage(String(err));

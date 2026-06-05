@@ -126,13 +126,10 @@ fn export_project(
     project_id: String,
     options: ExportOptions,
 ) -> Result<ExportResult, String> {
-    let project_path = state
-        .projects
-        .root
-        .join("projects")
-        .join(format!("{project_id}.json"));
+    let project = state.projects.load_project(&project_id)?;
     let result = render_project(
-        &project_path,
+        &project,
+        &state.projects.root.join("media"),
         &state.projects.exports_dir(),
         &options,
     )?;

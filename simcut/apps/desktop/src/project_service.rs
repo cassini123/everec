@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use crate::export_service::probe_duration_ms;
 use timeline_engine::{MediaAsset, Project, StillFrame, SubtitleCue};
 use uuid::Uuid;
 
@@ -131,12 +132,14 @@ impl ProjectService {
                 .to_string()
         });
 
+        let duration_ms = probe_duration_ms(&dest);
+
         let asset = MediaAsset {
             id: id.clone(),
             name: display_name,
             file_name,
             format: ext,
-            duration_ms: 0,
+            duration_ms,
             width: 1920,
             height: 1080,
             tags: tags.unwrap_or_default(),
@@ -144,6 +147,21 @@ impl ProjectService {
         };
 
         let mut project = self.load_project(project_id)?;
+
+        if duration_ms > 0 {
+            let clip = timeline_engine::Clip {
+                id: Uuid::new_v4().to_string(),
+                track_index: 0,
+                media_id: id.clone(),
+                start_ms: 0,
+                duration_ms,
+                trim_in_ms: 0,
+                trim_out_ms: duration_ms,
+                effect_ids: Vec::new(),
+            };
+            let _ = project.add_clip(clip);
+        }
+
         project.add_media(asset.clone());
         self.save_project(&project)?;
         Ok(asset)

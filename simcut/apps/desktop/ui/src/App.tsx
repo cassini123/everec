@@ -29,24 +29,22 @@ export default function App() {
     try {
       setProjects(await api.listProjects());
     } catch {
-      /* web preview */
+      /* ignore */
     }
   }, []);
+
+  const updateProject = useCallback(
+    async (updated: Project) => {
+      setProject(updated);
+      await api.saveProject(updated);
+      await refreshProjects();
+    },
+    [refreshProjects],
+  );
 
   useEffect(() => {
     refreshProjects().finally(() => setReady(true));
   }, [refreshProjects]);
-
-  useEffect(() => {
-    if (!playing || !project) return;
-    const id = window.setInterval(() => {
-      setPositionMs((p) => {
-        const next = p + 100;
-        return next >= project.durationMs ? 0 : next;
-      });
-    }, 100);
-    return () => window.clearInterval(id);
-  }, [playing, project]);
 
   const handleSelectProject = (p: Project) => {
     setProject(p);
@@ -91,16 +89,22 @@ export default function App() {
               </button>
             </div>
           ) : workspace === "edit" ? (
-            <EditView project={project} positionMs={positionMs} />
+            <EditView
+              project={project}
+              positionMs={positionMs}
+              playing={playing}
+              onProjectUpdate={updateProject}
+              onPositionChange={setPositionMs}
+            />
           ) : workspace === "subtitles" ? (
-            <SubtitlesView project={project} onUpdate={setProject} />
+            <SubtitlesView project={project} onUpdate={updateProject} />
           ) : workspace === "color" ? (
             <ColorView onApplyLut={setLutApplied} />
           ) : workspace === "stills" ? (
             <StillsView
               project={project}
               positionMs={positionMs}
-              onUpdate={setProject}
+              onUpdate={updateProject}
             />
           ) : workspace === "effects" ? (
             <EffectsView activeEffects={activeEffects} onToggle={handleToggleEffect} />

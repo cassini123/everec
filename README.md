@@ -6,65 +6,51 @@
 |------|------|------|
 | **Simcut** | `simcut/` | 轻量视频剪辑（Web + 桌面） |
 | **desound** | `desound/` | 音频 / 音效创作 |
+| **Knowgo** | `knowgo/` | 视觉灵感认知 + Project Graph |
 
-## Simcut Web（Vercel 在线版）
+## Vercel 在线部署
 
-独立网页端路径：`simcut/web/frontend`
+| 产品 | Vercel Root Directory | 构建 |
+|------|----------------------|------|
+| **Simcut** | `/`（仓库根） | 根目录 `vercel.json` |
+| **Knowgo** | **`knowgo`** | [knowgo/DEPLOY.md](knowgo/DEPLOY.md) |
 
-Vercel 已配置为自动构建部署：
+### Knowgo 部署（3 步）
 
-- **安装**：`npm install --prefix simcut/web/frontend`
-- **构建**：`npm run build --prefix simcut/web/frontend`
-- **输出**：`simcut/web/frontend/dist`
-- 在 [vercel.com](https://vercel.com) 导入 `cassini123/everec`，选 `main` 分支即可
+1. [Vercel New Project](https://vercel.com/new) → 导入 `cassini123/everec`
+2. **Root Directory** 设为 **`knowgo`**
+3. Deploy → 访问 `https://<项目名>.vercel.app`
 
-### 本地开发 Simcut Web
+验证：`curl https://<域名>/api/knowgo/health`
 
-```bash
-cd simcut/web/frontend
-npm install
-npm run dev
-```
-
-或在仓库根目录：
+### Simcut Web 本地
 
 ```bash
 npm run dev:simcut
+# 或 cd simcut/web/frontend && npm install && npm run dev
 ```
 
-浏览器打开 http://localhost:1421（端口占用时自动换 1422 等）
-
-或一键启动：
-
-```bash
-./start-simcut.sh
-```
-
-### 桌面端（完整渲染）
-
-```bash
-cd simcut/apps/desktop
-npm install && npm install --prefix ui
-npm run dev
-```
-
-需要 Rust ≥ 1.85 和 FFmpeg。
-
-## desound 本地开发
+### Knowgo 本地
 
 ```bash
 npm install
-npm run dev:web          # Web 端
-cd desound/desktop && npm install && npm install --prefix ui && npm run dev  # 桌面端
+npm run dev:knowgo
+# http://localhost:1421 · API :3002
+```
+
+### Desound 本地
+
+```bash
+npm run dev:web
 ```
 
 ## 目录结构
 
 ```text
 everec/
-├── simcut/           # 视频剪辑（Web SPA + Tauri 桌面）
+├── simcut/           # 视频剪辑
 ├── desound/          # 音频创作
-├── shared/           # 跨项目共享代码
-├── api/              # desound Vercel API（历史）
-└── docs/             # 产品文档
+├── knowgo/           # 视觉灵感（独立 Vercel Web）
+├── shared/
+└── docs/
 ```

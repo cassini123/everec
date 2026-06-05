@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-kg-bg: #0e0f12;
+  --color-kg-surface: #16181d;
+  --color-kg-panel: #1e2128;
+  --color-kg-elevated: #262a33;
+  --color-kg-border: #343a46;
+  --color-kg-muted: #8b919e;
+  --color-kg-text: #eceef2;
+  --color-kg-accent: #2dd4bf;
+  --color-kg-accent-dim: #14b8a6;
+  --color-kg-blue: #60a5fa;
+  --color-kg-purple: #c084fc;
+  --color-kg-orange: #fb923c;
+  --font-sans: "Inter", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-kg-bg);
+  color: var(--color-kg-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 4px;
+}
+
+input[type="range"] {
+  accent-color: var(--color-kg-accent);
+}
+
+.prose-edit:focus {
+  outline: 1px solid color-mix(in srgb, var(--color-kg-accent) 50%, transparent);
+}
+
+.font-preview-card {
+  background: linear-gradient(135deg, #1e2128 0%, #262a33 100%);
+}
+
+.shot-card:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-kg-accent) 40%, transparent);
+}

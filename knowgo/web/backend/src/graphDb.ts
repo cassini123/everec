@@ -1,7 +1,9 @@
-import Database from "better-sqlite3";
+import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
 import type { GraphEdge, GraphNode, GraphNodeType, ProjectGraph } from "@everec/shared";
+
+const require = createRequire(import.meta.url);
 
 const DATA_DIR = process.env.VERCEL
   ? path.join("/tmp", "everec-knowgo")
@@ -10,15 +12,21 @@ const DATA_DIR = process.env.VERCEL
 const DB_PATH = path.join(DATA_DIR, "project-graph.db");
 const GRAPHS_DIR = path.join(DATA_DIR, "graphs");
 
-let db: Database.Database | null = null;
+type SqliteDatabase = import("better-sqlite3").Database;
+
+let db: SqliteDatabase | null = null;
 
 function useSqlite(): boolean {
   return process.env.KNOWGO_GRAPH_STORE !== "json" && !process.env.VERCEL;
 }
 
-function getDb(): Database.Database {
+function getDb(): SqliteDatabase {
+  if (!useSqlite()) {
+    throw new Error("SQLite graph store is disabled");
+  }
   if (db) return db;
   fs.mkdirSync(DATA_DIR, { recursive: true });
+  const Database = require("better-sqlite3") as typeof import("better-sqlite3").default;
   db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
   db.exec(`
@@ -162,7 +170,6 @@ export function sqliteDeleteGraph(projectId: string): void {
   database.prepare("DELETE FROM graph_meta WHERE project_id = ?").run(projectId);
 }
 
-/** Import legacy JSON graph files into SQLite on first access */
 export function migrateJsonGraphToSqlite(projectId: string): ProjectGraph | null {
   if (!useSqlite()) return null;
   fs.mkdirSync(GRAPHS_DIR, { recursive: true });

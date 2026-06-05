@@ -47,6 +47,15 @@ npm run dev:knowgo
 
 可选：在界面中配置 OpenAI API Key 以启用 Vision / 视频语义分析；留空则使用本地启发式分析。
 
+## Vercel 部署（独立 Web 端）
+
+与 Desound 分开部署，详见 **[DEPLOY.md](./DEPLOY.md)**。
+
+```bash
+# 本地模拟 Vercel 构建
+npm run build:vercel-knowgo   # 在仓库根目录
+```
+
 ## 技术栈
 
 - React 19 + TypeScript + Vite 6 + Tailwind CSS 4

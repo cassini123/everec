@@ -41,4 +41,15 @@ cd desound/desktop && npm install && npm install --prefix ui && npm run dev
 | `simcut/apps/desktop/ui` | 不存在，simcut 尚未开发 |
 | `desound/apps/desktop` | `desound/desktop` |
 
-Web 预览：https://everec.vercel.app/
+Web 预览：
+
+- **Desound**（根目录部署）：https://everec.vercel.app/
+- **Knowgo**（Root Directory = `knowgo`）：见 [knowgo/DEPLOY.md](knowgo/DEPLOY.md)
+
+### Knowgo 部署到 Vercel
+
+1. 新建 Vercel 项目，连接本仓库  
+2. **Root Directory** 设为 `knowgo`  
+3. Deploy  
+
+详细步骤：[knowgo/DEPLOY.md](knowgo/DEPLOY.md)

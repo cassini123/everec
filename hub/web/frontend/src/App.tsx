@@ -10,7 +10,7 @@ import type { HubWorkspace } from "./types";
 
 const TITLES: Record<HubWorkspace, { title: string; subtitle?: string }> = {
   home: { title: "欢迎回来", subtitle: "统筹你的 Creative OS" },
-  apps: { title: "应用", subtitle: "Knowgo · Simcut · desound" },
+  apps: { title: "应用", subtitle: "Knowgo · Simcut · desound · Prerector" },
   projects: { title: "项目", subtitle: "跨应用项目管理" },
   brain: { title: "主脑", subtitle: "Project Graph · Style Dataset" },
   settings: { title: "设置", subtitle: "连接与开发配置" },

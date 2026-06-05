@@ -55,6 +55,19 @@ export const EVEREC_APPS: EverecApp[] = [
     pipelineStep: 0,
     features: ["AI 标签", "语义搜索", "iOS 同步", "一键创建"],
   },
+  {
+    id: "prerector",
+    name: "Prerector",
+    tagline: "协作制片",
+    description: "审片协作、任务分配、版本管理 — Project Graph 导出与团队共享",
+    icon: "users",
+    gradient: "from-sky-500/20 via-blue-500/10 to-indigo-600/20",
+    glowColor: "#60a5fa",
+    status: "coming_soon",
+    devUrl: "#",
+    pipelineStep: 4,
+    features: ["审片协作", "任务分配", "Graph 导出", "团队共享"],
+  },
 ];
 
 export const PIPELINE: PipelineStep[] = [
@@ -78,9 +91,9 @@ export const PIPELINE: PipelineStep[] = [
   },
   {
     step: 4,
-    label: "交付分享",
-    appId: "simcut",
-    description: "导出 → 审片 → 归档",
+    label: "协作交付",
+    appId: "prerector",
+    description: "审片 → 协作 → Graph 归档",
   },
 ];
 

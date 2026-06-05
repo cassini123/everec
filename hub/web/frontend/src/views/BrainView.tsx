@@ -5,6 +5,7 @@ import {
   Layers,
   Network,
   Share2,
+  Users,
 } from "lucide-react";
 import { launchApp, EVEREC_APPS } from "../lib/apps";
 
@@ -38,6 +39,12 @@ const BRAIN_FEATURES = [
     title: "云同步 (Phase 3+)",
     desc: "embedding 跨设备、图谱备份、AI offload — 本地优先",
     app: "knowgo",
+  },
+  {
+    icon: Users,
+    title: "Prerector 协作",
+    desc: "Graph JSON 导出 / import、审片协作与团队制片 — 暂缓模块",
+    app: "prerector",
   },
 ];
 

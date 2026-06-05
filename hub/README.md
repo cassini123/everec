@@ -29,7 +29,7 @@ npm run dev:web      # desound
 ## 功能
 
 - **首页** — 应用网格、创作闭环、最近项目
-- **应用** — 各产品详情与一键启动
+- **应用** — Knowgo、Simcut、desound、Inspibrary、Prerector 等产品入口
 - **项目** — 跨应用项目创建与浏览
 - **主脑** — Project Graph / Style Dataset 认知层概览
 - **设置** — 开发地址与启动命令

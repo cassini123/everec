@@ -3,6 +3,7 @@ import {
   Film,
   Music,
   Sparkles,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import type { EverecAppId } from "../types";
@@ -12,6 +13,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   film: Film,
   music: Music,
   sparkles: Sparkles,
+  users: Users,
 };
 
 interface Props {
@@ -31,6 +33,7 @@ export function getAppAccent(appId: EverecAppId): string {
     simcut: "text-ev-orange",
     desound: "text-ev-purple",
     inspibrary: "text-ev-pink",
+    prerector: "text-ev-blue",
   };
   return accents[appId];
 }

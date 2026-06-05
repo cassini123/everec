@@ -1,6 +1,11 @@
 export type HubWorkspace = "home" | "apps" | "projects" | "brain" | "settings";
 
-export type EverecAppId = "simcut" | "desound" | "knowgo" | "inspibrary";
+export type EverecAppId =
+  | "simcut"
+  | "desound"
+  | "knowgo"
+  | "inspibrary"
+  | "prerector";
 
 export type AppStatus = "ready" | "beta" | "coming_soon";
 

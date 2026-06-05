@@ -92,7 +92,7 @@ export function AppCard({ app, compact }: Props) {
       {disabled && (
         <div className="mt-3 flex items-center gap-1.5 text-xs text-ev-muted">
           <Clock size={12} />
-          Phase 6 规划中
+          {app.id === "inspibrary" ? "Phase 6 规划中" : "路线图规划中"}
         </div>
       )}
     </button>

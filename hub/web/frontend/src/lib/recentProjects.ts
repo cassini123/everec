@@ -61,4 +61,5 @@ export const APP_LABELS: Record<EverecAppId, string> = {
   simcut: "Simcut",
   desound: "desound",
   inspibrary: "Inspibrary",
+  prerector: "Prerector",
 };

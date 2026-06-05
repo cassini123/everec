@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install --prefix desound/apps/desktop/ui",
-  "buildCommand": "npm run build --prefix desound/apps/desktop/ui",
-  "outputDirectory": "desound/apps/desktop/ui/dist",
+  "installCommand": "npm install --prefix simcut/apps/desktop/ui",
+  "buildCommand": "npm run build --prefix simcut/apps/desktop/ui",
+  "outputDirectory": "simcut/apps/desktop/ui/dist",
   "framework": "vite"
 }

@@ -5,13 +5,24 @@ import {
   getStoredApiKey,
   setStoredApiKey,
 } from "../lib/soundDesign";
-import type { SoundDesignResult } from "../types";
+import { ProjectPicker } from "../components/layout/ProjectPicker";
+import type { DesoundProjectSummary, SoundDesignResult } from "../types";
 
 interface DesignViewProps {
+  projects: DesoundProjectSummary[];
+  activeProjectId: string | null;
+  onProjectSelect: (id: string) => void;
+  onGoToProjects?: () => void;
   onApplyKeywords?: (keywords: string[]) => void;
 }
 
-export function DesignView({ onApplyKeywords }: DesignViewProps) {
+export function DesignView({
+  projects,
+  activeProjectId,
+  onProjectSelect,
+  onGoToProjects,
+  onApplyKeywords,
+}: DesignViewProps) {
   const [description, setDescription] = useState("");
   const [apiKey, setApiKey] = useState(getStoredApiKey());
   const [loading, setLoading] = useState(false);
@@ -40,6 +51,14 @@ export function DesignView({ onApplyKeywords }: DesignViewProps) {
     <div className="flex min-h-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col border-r border-ds-border">
         <div className="border-b border-ds-border bg-ds-panel px-4 py-3">
+          <div className="mb-2">
+            <ProjectPicker
+              projects={projects}
+              activeProjectId={activeProjectId}
+              onSelect={onProjectSelect}
+              onManage={onGoToProjects}
+            />
+          </div>
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <Sparkles className="h-5 w-5 text-ds-purple" />
             声音设计 · AI 辅助

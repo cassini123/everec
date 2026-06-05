@@ -1,4 +1,27 @@
-export type Workspace = "library" | "foley" | "compose" | "processing" | "design";
+export type Workspace =
+  | "projects"
+  | "library"
+  | "foley"
+  | "compose"
+  | "processing"
+  | "design";
+
+export interface DesoundProjectSummary {
+  id: string;
+  name: string;
+  soundCount: number;
+  updatedAt: string;
+}
+
+export interface DesoundProject {
+  id: string;
+  name: string;
+  soundCount: number;
+  tags: string[];
+  bpm: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export type BottomPanel = "effects" | "dubbing";
 

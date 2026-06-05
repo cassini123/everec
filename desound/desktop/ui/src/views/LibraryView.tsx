@@ -24,10 +24,20 @@ import {
   searchMusicOnline,
 } from "../lib/musicFetch";
 import { formatResultLabel } from "@everec/shared";
-import type { LinkParseResult, MusicSearchResult, SoundAsset } from "../types";
+import { ProjectPicker } from "../components/layout/ProjectPicker";
+import type {
+  DesoundProjectSummary,
+  LinkParseResult,
+  MusicSearchResult,
+  SoundAsset,
+} from "../types";
 
 interface LibraryViewProps {
   sounds: SoundAsset[];
+  projects: DesoundProjectSummary[];
+  activeProjectId: string | null;
+  onProjectSelect: (id: string) => void;
+  onGoToProjects?: () => void;
   onRefresh: () => void;
   onExport?: () => void;
 }
@@ -66,7 +76,15 @@ function formatDurationSec(sec: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
+export function LibraryView({
+  sounds,
+  projects,
+  activeProjectId,
+  onProjectSelect,
+  onGoToProjects,
+  onRefresh,
+  onExport,
+}: LibraryViewProps) {
   const [musicSubTab, setMusicSubTab] = useState<MusicSubTab>("grid");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category>("all");
@@ -211,6 +229,12 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 border-b border-ds-border bg-ds-panel px-4 py-3">
+          <ProjectPicker
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onSelect={onProjectSelect}
+            onManage={onGoToProjects}
+          />
           <button
             type="button"
             onClick={handleUploadBgm}
@@ -222,7 +246,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
             ) : (
               <Upload className="h-4 w-4" />
             )}
-            {importing ? "上传中…" : "上传 BGM"}
+            {importing ? "上传中…" : "上传"}
           </button>
 
           <div className="relative ml-auto flex-1 max-w-xs">
@@ -305,7 +329,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
               {filtered.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 text-ds-muted">
                   <FileAudio className="h-12 w-12 opacity-30" />
-                  <p className="text-sm">暂无素材 — 上传 BGM 或联网搜索添加</p>
+                  <p className="text-sm">暂无素材 — 上传或联网搜索添加</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">

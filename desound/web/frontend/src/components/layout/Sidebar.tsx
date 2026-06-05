@@ -1,4 +1,5 @@
 import {
+  Briefcase,
   FolderOpen,
   Mic2,
   Music4,
@@ -6,6 +7,20 @@ import {
   Waves,
 } from "lucide-react";
 import type { Workspace } from "../../types";
+
+const projectItem: {
+  id: Workspace;
+  label: string;
+  sub: string;
+  icon: typeof Briefcase;
+  color: string;
+} = {
+  id: "projects",
+  label: "项目",
+  sub: "文件管理",
+  icon: Briefcase,
+  color: "text-ds-accent",
+};
 
 const topItems: {
   id: Workspace;
@@ -128,6 +143,14 @@ export function Sidebar({ workspace, onChange }: SidebarProps) {
         Workspace
       </div>
       <nav className="flex flex-col gap-1 px-2">
+        <NavButton
+          {...projectItem}
+          active={workspace === projectItem.id}
+          onChange={onChange}
+        />
+
+        <div className="my-1 border-t border-ds-border/60" />
+
         {topItems.map((item) => (
           <NavButton
             key={item.id}

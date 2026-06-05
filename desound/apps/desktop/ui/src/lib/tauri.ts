@@ -20,4 +20,5 @@ export async function invoke<T>(
   return tauriInvoke<T>(cmd, args);
 }
 
-export const DESKTOP_APP_HINT = "请在 desound 客户端中使用此功能（在 apps/desktop 目录运行 npm run dev 启动）";
+export const DESKTOP_APP_HINT =
+  "请先克隆项目并启动客户端：git clone https://github.com/cassini123/everec.git && cd everec/desound/apps/desktop && npm install && npm install --prefix ui && npm run dev";

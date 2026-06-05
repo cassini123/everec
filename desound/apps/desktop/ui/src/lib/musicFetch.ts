@@ -1,5 +1,5 @@
-import type { LinkParseResult, MusicSearchResult } from "../types";
-import { invoke, isTauriApp } from "./tauri";
+import type { LinkParseResult, MusicSearchResult, SoundAsset } from "../types";
+import { DESKTOP_APP_HINT, invoke, isTauriApp } from "./tauri";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -12,32 +12,8 @@ async function fetchJson<T>(url: string, referer?: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function downloadBytes(url: string, referer?: string): Promise<Uint8Array> {
-  const headers: Record<string, string> = { "User-Agent": USER_AGENT };
-  if (referer) headers.Referer = referer;
-  const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`下载失败: HTTP ${res.status}`);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-async function saveTempAndImport(
-  filename: string,
-  data: Uint8Array,
-  name: string,
-  tags: string[],
-  sourceLabel: string,
-): Promise<void> {
-  const tempPath = await invoke<string>("save_temp_audio", { filename, data: Array.from(data) });
-  try {
-    await invoke("import_downloaded_file", {
-      sourcePath: tempPath,
-      name,
-      tags,
-      sourceLabel,
-    });
-  } finally {
-    await invoke("delete_temp_file", { path: tempPath }).catch(() => {});
-  }
+function requireDesktop(): void {
+  if (!isTauriApp()) throw new Error(DESKTOP_APP_HINT);
 }
 
 export function detectPlatform(url: string): string | null {
@@ -158,6 +134,7 @@ export async function parseMediaUrl(url: string): Promise<LinkParseResult> {
     }
   }
   if (platform === "douyin" || platform === "xiaohongshu" || platform === "bilibili") {
+    requireDesktop();
     const hasYtdlp = await invoke<boolean>("check_ytdlp");
     if (!hasYtdlp) throw new Error("解析此平台需要 yt-dlp，请安装: pip install yt-dlp");
     return {
@@ -171,62 +148,66 @@ export async function parseMediaUrl(url: string): Promise<LinkParseResult> {
   throw new Error("暂不支持该平台，目前支持: Bilibili、抖音、小红书");
 }
 
-export async function saveSearchResultToLibrary(result: MusicSearchResult): Promise<void> {
-  if (!isTauriApp()) {
-    throw new Error("保存至素材库需使用 Tauri 桌面应用");
-  }
+async function importViaHttp(
+  url: string,
+  name: string,
+  tags: string[],
+  sourceLabel: string,
+  referer?: string,
+): Promise<SoundAsset> {
+  return invoke<SoundAsset>("import_from_http_url", {
+    url,
+    name,
+    tags,
+    sourceLabel,
+    referer,
+  });
+}
+
+export async function saveSearchResultToLibrary(result: MusicSearchResult): Promise<SoundAsset> {
+  requireDesktop();
   const displayName = `${result.title} - ${result.artist}`;
   const tags = ["bgm", "search", result.source];
+  const sourceLabel = `search:${result.source}`;
 
   if (result.source === "itunes" && result.previewUrl) {
-    const ext = result.previewUrl.includes(".m4a") ? "m4a" : "mp3";
-    const data = await downloadBytes(result.previewUrl);
-    await saveTempAndImport(
-      `search_${Date.now()}.${ext}`,
-      data,
-      displayName,
-      tags,
-      `search:${result.source}`,
-    );
-    return;
+    return importViaHttp(result.previewUrl, displayName, tags, sourceLabel);
   }
 
   if (result.source === "netease") {
     const songId = result.id.replace("netease:", "");
     const url = `https://music.163.com/song/media/outer/url?id=${songId}.mp3`;
-    await invoke("download_media_with_ytdlp", {
-      url,
-      name: displayName,
-      tags,
-      sourceLabel: `search:${result.source}`,
-    });
-    return;
+    try {
+      return await importViaHttp(url, displayName, tags, sourceLabel, "https://music.163.com/");
+    } catch {
+      return invoke<SoundAsset>("download_media_with_ytdlp", {
+        url,
+        name: displayName,
+        tags,
+        sourceLabel,
+      });
+    }
   }
 
   throw new Error("该歌曲暂无可用音频");
 }
 
-export async function saveLinkToLibrary(link: LinkParseResult): Promise<void> {
-  if (!isTauriApp()) {
-    throw new Error("保存至素材库需使用 Tauri 桌面应用");
-  }
+export async function saveLinkToLibrary(link: LinkParseResult): Promise<SoundAsset> {
+  requireDesktop();
   const tags = ["bgm", link.platform];
   const sourceLabel = `link:${link.platform}`;
 
   if (link.platform === "bilibili" && link.audioUrl) {
-    const ext = link.audioUrl.includes(".m4a") ? "m4a" : "mp3";
-    const data = await downloadBytes(link.audioUrl, "https://www.bilibili.com");
-    await saveTempAndImport(
-      `bilibili_${Date.now()}.${ext}`,
-      data,
+    return importViaHttp(
+      link.audioUrl,
       link.title,
       tags,
       sourceLabel,
+      "https://www.bilibili.com",
     );
-    return;
   }
 
-  await invoke("download_media_with_ytdlp", {
+  return invoke<SoundAsset>("download_media_with_ytdlp", {
     url: link.originalUrl,
     name: link.title !== "待下载" ? link.title : undefined,
     tags,
@@ -235,5 +216,6 @@ export async function saveLinkToLibrary(link: LinkParseResult): Promise<void> {
 }
 
 export async function checkYtdlpAvailable(): Promise<boolean> {
+  if (!isTauriApp()) return false;
   return invoke<boolean>("check_ytdlp");
 }

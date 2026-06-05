@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
+  CheckCircle2,
   Download,
   FileAudio,
   Globe,
@@ -12,8 +13,10 @@ import {
   Tag,
   Trash2,
   Upload,
+  XCircle,
 } from "lucide-react";
 import { api } from "../lib/api";
+import { DESKTOP_APP_HINT } from "../lib/tauri";
 import {
   parseMediaUrl,
   saveLinkToLibrary,
@@ -30,6 +33,7 @@ interface LibraryViewProps {
 
 type LibraryTab = "library" | "search" | "link";
 type Category = "all" | "imported" | "foley" | "music";
+type Toast = { type: "success" | "error"; message: string };
 
 const categories: Category[] = ["all", "imported", "foley", "music"];
 
@@ -69,7 +73,26 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
   const [category, setCategory] = useState<Category>("all");
   const [selected, setSelected] = useState<SoundAsset | null>(null);
   const [importing, setImporting] = useState(false);
-  const [statusMsg, setStatusMsg] = useState("");
+  const [toast, setToast] = useState<Toast | null>(null);
+
+  const showToast = useCallback((type: Toast["type"], message: string) => {
+    setToast({ type, message });
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [toast]);
+
+  const showSaveSuccess = useCallback(
+    (name: string) => {
+      setTab("library");
+      setCategory("all");
+      showToast("success", `保存成功：${name} 已添加到我的素材`);
+    },
+    [showToast],
+  );
 
   // Online search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,7 +117,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
 
   const handleUploadBgm = async () => {
     if (!api.isDesktop()) {
-      setStatusMsg("浏览器预览模式不支持上传，请使用 Tauri 桌面应用");
+      showToast("error", DESKTOP_APP_HINT);
       return;
     }
     const path = await open({
@@ -109,13 +132,12 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
     if (!path || typeof path !== "string") return;
 
     setImporting(true);
-    setStatusMsg("");
     try {
-      await api.importSound(path, undefined, ["bgm", "upload"], "music");
+      const asset = await api.importSound(path, undefined, ["bgm", "upload"], "music");
       await onRefresh();
-      setStatusMsg("BGM 上传成功");
+      showSaveSuccess(asset.name);
     } catch (err) {
-      setStatusMsg(String(err));
+      showToast("error", String(err));
     } finally {
       setImporting(false);
     }
@@ -130,28 +152,26 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
-    setStatusMsg("");
     setSearchResults([]);
     try {
       const results = await searchMusicOnline(searchQuery.trim(), 20);
       setSearchResults(results);
-      if (results.length === 0) setStatusMsg("未找到相关歌曲");
+      if (results.length === 0) showToast("error", "未找到相关歌曲");
     } catch (err) {
-      setStatusMsg(String(err));
+      showToast("error", String(err));
     } finally {
       setSearching(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, showToast]);
 
   const handleSaveSearchResult = async (result: MusicSearchResult) => {
     setSavingId(result.id);
-    setStatusMsg("");
     try {
-      await saveSearchResultToLibrary(result);
+      const asset = await saveSearchResultToLibrary(result);
       await onRefresh();
-      setStatusMsg(`已保存: ${result.title}`);
+      showSaveSuccess(asset.name);
     } catch (err) {
-      setStatusMsg(String(err));
+      showToast("error", String(err));
     } finally {
       setSavingId(null);
     }
@@ -160,13 +180,12 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
   const handleParseLink = async () => {
     if (!linkUrl.trim()) return;
     setParsing(true);
-    setStatusMsg("");
     setLinkResult(null);
     try {
       const result = await parseMediaUrl(linkUrl.trim());
       setLinkResult(result);
     } catch (err) {
-      setStatusMsg(String(err));
+      showToast("error", String(err));
     } finally {
       setParsing(false);
     }
@@ -175,15 +194,14 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
   const handleSaveLink = async () => {
     if (!linkResult) return;
     setLinkSaving(true);
-    setStatusMsg("");
     try {
-      await saveLinkToLibrary(linkResult);
+      const asset = await saveLinkToLibrary(linkResult);
       await onRefresh();
-      setStatusMsg(`已保存 BGM: ${linkResult.title}`);
+      showSaveSuccess(asset.name);
       setLinkResult(null);
       setLinkUrl("");
     } catch (err) {
-      setStatusMsg(String(err));
+      showToast("error", String(err));
     } finally {
       setLinkSaving(false);
     }
@@ -221,7 +239,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
                 type="button"
                 onClick={() => {
                   setTab(id);
-                  setStatusMsg("");
+                  setToast(null);
                 }}
                 className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs transition ${
                   tab === id
@@ -248,9 +266,20 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
           )}
         </div>
 
-        {statusMsg && (
-          <div className="border-b border-ds-border bg-ds-elevated px-4 py-2 text-xs text-ds-muted">
-            {statusMsg}
+        {toast && (
+          <div
+            className={`flex items-center gap-2 border-b px-4 py-2.5 text-sm ${
+              toast.type === "success"
+                ? "border-ds-green/30 bg-ds-green/10 text-ds-green"
+                : "border-red-900/30 bg-red-950/40 text-red-300"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 shrink-0" />
+            )}
+            {toast.message}
           </div>
         )}
 

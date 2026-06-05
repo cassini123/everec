@@ -76,3 +76,30 @@ pub fn download_with_yt_dlp(url: &str, dest_dir: &Path) -> Result<PathBuf, Strin
 pub fn check_yt_dlp_available() -> bool {
     find_yt_dlp().is_some()
 }
+
+pub fn download_http(url: &str, dest: &Path, referer: Option<&str>) -> Result<(), String> {
+    fs_create_dir(dest.parent().unwrap_or(dest))?;
+    let mut cmd = Command::new("curl");
+    cmd.args([
+        "-L",
+        "-s",
+        "-f",
+        "-o",
+        &dest.to_string_lossy(),
+        url,
+        "-H",
+        "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    ]);
+    if let Some(r) = referer {
+        cmd.args(["-H", &format!("Referer: {r}")]);
+    }
+    let output = cmd.output().map_err(|e| format!("curl 执行失败: {e}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("下载失败: {stderr}"));
+    }
+    if !dest.exists() || dest.metadata().map(|m| m.len()).unwrap_or(0) == 0 {
+        return Err("下载失败: 文件为空".into());
+    }
+    Ok(())
+}

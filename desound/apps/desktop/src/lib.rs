@@ -9,7 +9,7 @@ use std::process::Command;
 use audio_service::{instrument_slug, resolve_instrument, AudioRequest, AudioService};
 use instruments::{catalog, InstrumentCategory, InstrumentDefinition};
 use serde::{Deserialize, Serialize};
-use library_fetch::download_with_yt_dlp;
+use library_fetch::{download_http, download_with_yt_dlp};
 use sound_design::analyze_local;
 use tauri::{Manager, State};
 use uuid::Uuid;
@@ -398,6 +398,36 @@ fn get_library_dir(state: State<'_, AppState>) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn import_from_http_url(
+    state: State<'_, AppState>,
+    url: String,
+    name: Option<String>,
+    tags: Option<Vec<String>>,
+    source_label: Option<String>,
+    referer: Option<String>,
+) -> Result<SoundAsset, String> {
+    let temp_dir = state.library_dir.join("temp");
+    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+    let ext = if url.contains(".m4a") { "m4a" } else { "mp3" };
+    let temp_file = temp_dir.join(format!("download_{}.{}", uuid::Uuid::new_v4(), ext));
+    download_http(&url, &temp_file, referer.as_deref())?;
+    let mut tag_list = tags.unwrap_or_default();
+    if !tag_list.contains(&"bgm".to_string()) {
+        tag_list.push("bgm".into());
+    }
+    let result = import_sound_internal(
+        &state.library_dir,
+        &temp_file,
+        name,
+        Some(tag_list),
+        Some("music".into()),
+        source_label.unwrap_or_else(|| "download".into()),
+    );
+    let _ = std::fs::remove_file(&temp_file);
+    result
+}
+
+#[tauri::command]
 fn download_media_with_ytdlp(
     state: State<'_, AppState>,
     url: String,
@@ -593,6 +623,7 @@ pub fn run() {
             analyze_sound_design,
             get_library_dir,
             download_media_with_ytdlp,
+            import_from_http_url,
             import_downloaded_file,
             save_temp_audio,
             delete_temp_file,

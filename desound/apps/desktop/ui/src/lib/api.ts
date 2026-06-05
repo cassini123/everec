@@ -5,25 +5,27 @@ import type {
   SoundDesignResult,
   TrackInfo,
 } from "../types";
-import { MOCK_INSTRUMENTS, MOCK_SOUNDS, MOCK_TRACKS } from "./mockData";
-import { invoke, isTauriApp } from "./tauri";
+import { DESKTOP_APP_HINT, invoke, isTauriApp } from "./tauri";
+
+function requireDesktop<T>(fn: () => Promise<T>): Promise<T> {
+  if (!isTauriApp()) return Promise.reject(new Error(DESKTOP_APP_HINT));
+  return fn();
+}
 
 export const api = {
   isDesktop: isTauriApp,
 
   listInstruments: (): Promise<InstrumentInfo[]> =>
-    isTauriApp() ? invoke("list_instruments") : Promise.resolve(MOCK_INSTRUMENTS),
+    isTauriApp() ? invoke("list_instruments") : Promise.resolve([]),
 
   initAudio: (): Promise<void> =>
     isTauriApp() ? invoke("init_audio") : Promise.resolve(),
 
   listTracks: (): Promise<TrackInfo[]> =>
-    isTauriApp() ? invoke("list_tracks") : Promise.resolve(MOCK_TRACKS),
+    isTauriApp() ? invoke("list_tracks") : Promise.resolve([]),
 
   addTrack: (name: string, instrument: string): Promise<number> =>
-    isTauriApp()
-      ? invoke("add_track", { name, instrument })
-      : Promise.reject(new Error("浏览器预览模式不支持此操作")),
+    requireDesktop(() => invoke("add_track", { name, instrument })),
 
   setTrackInstrument: (track: number, instrument: string): Promise<void> =>
     isTauriApp()
@@ -54,7 +56,7 @@ export const api = {
     isTauriApp() ? invoke("all_notes_off", { track }) : Promise.resolve(),
 
   listLibrarySounds: (): Promise<SoundAsset[]> =>
-    isTauriApp() ? invoke("list_library_sounds") : Promise.resolve(MOCK_SOUNDS),
+    isTauriApp() ? invoke("list_library_sounds") : Promise.resolve([]),
 
   importSound: (
     sourcePath: string,
@@ -62,34 +64,22 @@ export const api = {
     tags?: string[],
     category?: string,
   ): Promise<SoundAsset> =>
-    isTauriApp()
-      ? invoke("import_sound", { sourcePath, name, tags, category })
-      : Promise.reject(new Error("浏览器预览模式不支持上传，请使用 Tauri 桌面应用")),
+    requireDesktop(() => invoke("import_sound", { sourcePath, name, tags, category })),
 
   saveFoleySound: (name: string, presetId: string, tags?: string[]): Promise<SoundAsset> =>
-    isTauriApp()
-      ? invoke("save_foley_sound", { name, presetId, tags })
-      : Promise.reject(new Error("浏览器预览模式不支持此操作")),
+    requireDesktop(() => invoke("save_foley_sound", { name, presetId, tags })),
 
   deleteSound: (id: string): Promise<void> =>
-    isTauriApp()
-      ? invoke("delete_sound", { id })
-      : Promise.reject(new Error("浏览器预览模式不支持此操作")),
+    requireDesktop(() => invoke("delete_sound", { id })),
 
   exportSound: (soundId: string, format: ExportFormat, destPath: string): Promise<string> =>
-    isTauriApp()
-      ? invoke("export_sound", { soundId, format, destPath })
-      : Promise.reject(new Error("浏览器预览模式不支持导出")),
+    requireDesktop(() => invoke("export_sound", { soundId, format, destPath })),
 
   analyzeSoundDesign: (description: string): Promise<SoundDesignResult> =>
-    isTauriApp()
-      ? invoke("analyze_sound_design", { description })
-      : Promise.reject(new Error("浏览器预览模式请使用本地分析")),
+    requireDesktop(() => invoke("analyze_sound_design", { description })),
 
   getLibraryDir: (): Promise<string> =>
-    isTauriApp()
-      ? invoke("get_library_dir")
-      : Promise.reject(new Error("浏览器预览模式不可用")),
+    requireDesktop(() => invoke("get_library_dir")),
 
   checkYtdlp: (): Promise<boolean> =>
     isTauriApp() ? invoke("check_ytdlp") : Promise.resolve(false),

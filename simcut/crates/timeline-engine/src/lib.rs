@@ -184,6 +184,7 @@ impl Project {
 
 pub fn default_effect_presets() -> Vec<EffectPreset> {
     vec![
+        // 转场特效
         EffectPreset {
             id: "fade-in".into(),
             name: "渐显".into(),
@@ -197,22 +198,84 @@ pub fn default_effect_presets() -> Vec<EffectPreset> {
             params: [("duration_ms".into(), 500.0)].into(),
         },
         EffectPreset {
+            id: "flash-white".into(),
+            name: "闪白".into(),
+            category: "transition".into(),
+            params: [("duration_ms".into(), 200.0), ("intensity".into(), 1.0)].into(),
+        },
+        EffectPreset {
+            id: "dissolve".into(),
+            name: "叠化".into(),
+            category: "transition".into(),
+            params: [("duration_ms".into(), 600.0), ("intensity".into(), 0.5)].into(),
+        },
+        EffectPreset {
+            id: "wipe".into(),
+            name: "划像".into(),
+            category: "transition".into(),
+            params: [("duration_ms".into(), 400.0)].into(),
+        },
+        // 画面效果
+        EffectPreset {
             id: "highlight".into(),
             name: "高亮".into(),
-            category: "emphasis".into(),
+            category: "visual".into(),
             params: [("intensity".into(), 0.6), ("radius".into(), 12.0)].into(),
         },
         EffectPreset {
             id: "zoom-in".into(),
             name: "推近".into(),
-            category: "motion".into(),
+            category: "visual".into(),
             params: [("scale".into(), 1.15), ("duration_ms".into(), 800.0)].into(),
         },
         EffectPreset {
             id: "blur-bg".into(),
             name: "背景虚化".into(),
-            category: "style".into(),
+            category: "visual".into(),
             params: [("blur".into(), 8.0)].into(),
+        },
+        EffectPreset {
+            id: "slow-mo".into(),
+            name: "慢动作".into(),
+            category: "visual".into(),
+            params: [("scale".into(), 0.5)].into(),
+        },
+        EffectPreset {
+            id: "sharpen".into(),
+            name: "锐化".into(),
+            category: "visual".into(),
+            params: [("intensity".into(), 0.7)].into(),
+        },
+        // 环境特效
+        EffectPreset {
+            id: "rain".into(),
+            name: "雨滴".into(),
+            category: "environment".into(),
+            params: [("intensity".into(), 0.6)].into(),
+        },
+        EffectPreset {
+            id: "snow".into(),
+            name: "飘雪".into(),
+            category: "environment".into(),
+            params: [("intensity".into(), 0.5)].into(),
+        },
+        EffectPreset {
+            id: "fog".into(),
+            name: "雾霭".into(),
+            category: "environment".into(),
+            params: [("intensity".into(), 0.4), ("blur".into(), 12.0)].into(),
+        },
+        EffectPreset {
+            id: "bokeh".into(),
+            name: "光斑".into(),
+            category: "environment".into(),
+            params: [("intensity".into(), 0.5), ("blur".into(), 4.0)].into(),
+        },
+        EffectPreset {
+            id: "dust".into(),
+            name: "尘埃".into(),
+            category: "environment".into(),
+            params: [("intensity".into(), 0.3)].into(),
         },
     ]
 }

@@ -39,6 +39,7 @@ export const api = {
   analyzeSoundDesign: (description: string) =>
     invoke<SoundDesignResult>("analyze_sound_design", { description }),
   getLibraryDir: () => invoke<string>("get_library_dir"),
+  checkYtdlp: () => invoke<boolean>("check_ytdlp"),
 };
 
 export function noteName(midi: number): string {

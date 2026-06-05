@@ -36,6 +36,27 @@ export interface SoundAsset {
   source: string;
 }
 
+export interface MusicSearchResult {
+  id: string;
+  title: string;
+  artist: string;
+  album: string;
+  durationMs: number;
+  previewUrl?: string;
+  coverUrl?: string;
+  source: string;
+}
+
+export interface LinkParseResult {
+  platform: string;
+  title: string;
+  author: string;
+  durationSec: number;
+  coverUrl?: string;
+  audioUrl?: string;
+  originalUrl: string;
+}
+
 export interface FoleyPreset {
   id: string;
   name: string;

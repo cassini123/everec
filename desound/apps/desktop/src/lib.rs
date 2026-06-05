@@ -1,4 +1,5 @@
 mod audio_service;
+mod library_fetch;
 mod sound_design;
 
 use std::fs;
@@ -8,6 +9,7 @@ use std::process::Command;
 use audio_service::{instrument_slug, resolve_instrument, AudioRequest, AudioService};
 use instruments::{catalog, InstrumentCategory, InstrumentDefinition};
 use serde::{Deserialize, Serialize};
+use library_fetch::download_with_yt_dlp;
 use sound_design::analyze_local;
 use tauri::{Manager, State};
 use uuid::Uuid;
@@ -395,6 +397,150 @@ fn get_library_dir(state: State<'_, AppState>) -> Result<String, String> {
     Ok(state.library_dir.to_string_lossy().into_owned())
 }
 
+#[tauri::command]
+fn download_media_with_ytdlp(
+    state: State<'_, AppState>,
+    url: String,
+    name: Option<String>,
+    tags: Option<Vec<String>>,
+    source_label: Option<String>,
+) -> Result<SoundAsset, String> {
+    let temp_dir = state.library_dir.join("temp");
+    let downloaded = download_with_yt_dlp(&url, &temp_dir)?;
+    let display_name = name.unwrap_or_else(|| {
+        downloaded
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("BGM")
+            .to_string()
+    });
+    let mut tag_list = tags.unwrap_or_default();
+    if !tag_list.contains(&"bgm".to_string()) {
+        tag_list.push("bgm".into());
+    }
+    let result = import_sound_internal(
+        &state.library_dir,
+        &downloaded,
+        Some(display_name),
+        Some(tag_list),
+        Some("music".into()),
+        source_label.unwrap_or_else(|| "link".into()),
+    );
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    result
+}
+
+#[tauri::command]
+fn import_downloaded_file(
+    state: State<'_, AppState>,
+    source_path: String,
+    name: Option<String>,
+    tags: Option<Vec<String>>,
+    source_label: Option<String>,
+) -> Result<SoundAsset, String> {
+    let source = PathBuf::from(&source_path);
+    let mut tag_list = tags.unwrap_or_default();
+    if !tag_list.contains(&"bgm".to_string()) {
+        tag_list.push("bgm".into());
+    }
+    import_sound_internal(
+        &state.library_dir,
+        &source,
+        name,
+        Some(tag_list),
+        Some("music".into()),
+        source_label.unwrap_or_else(|| "search".into()),
+    )
+}
+
+#[tauri::command]
+fn save_temp_audio(
+    state: State<'_, AppState>,
+    filename: String,
+    data: Vec<u8>,
+) -> Result<String, String> {
+    let temp_dir = state.library_dir.join("temp");
+    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+    let safe_name: String = filename
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let path = temp_dir.join(safe_name);
+    std::fs::write(&path, data).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn delete_temp_file(path: String) -> Result<(), String> {
+    let p = PathBuf::from(path);
+    if p.exists() {
+        std::fs::remove_file(p).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn check_ytdlp() -> bool {
+    library_fetch::check_yt_dlp_available()
+}
+
+fn import_sound_internal(
+    library_dir: &Path,
+    source: &Path,
+    name: Option<String>,
+    tags: Option<Vec<String>>,
+    category: Option<String>,
+    source_label: String,
+) -> Result<SoundAsset, String> {
+    ensure_library(library_dir)?;
+
+    if !source.exists() {
+        return Err(format!("file not found: {}", source.display()));
+    }
+
+    let ext = source
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("mp3")
+        .to_lowercase();
+
+    let id = Uuid::new_v4().to_string();
+    let file_name = format!("{id}.{ext}");
+    let dest = library_dir.join("sounds").join(&file_name);
+    fs::copy(source, &dest).map_err(|err| err.to_string())?;
+
+    let display_name = name.unwrap_or_else(|| {
+        source
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or("Untitled")
+            .to_string()
+    });
+
+    let asset = SoundAsset {
+        id: id.clone(),
+        name: display_name,
+        file_name,
+        format: ext,
+        duration_ms: 0,
+        tags: tags.unwrap_or_default(),
+        category: category.unwrap_or_else(|| "music".into()),
+        created_at: chrono_now(),
+        source: source_label,
+    };
+
+    let mut manifest = read_manifest(library_dir)?;
+    manifest.sounds.push(asset.clone());
+    write_manifest(library_dir, &manifest)?;
+    Ok(asset)
+}
+
 fn chrono_now() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let secs = SystemTime::now()
@@ -446,6 +592,11 @@ pub fn run() {
             export_sound,
             analyze_sound_design,
             get_library_dir,
+            download_media_with_ytdlp,
+            import_downloaded_file,
+            save_temp_audio,
+            delete_temp_file,
+            check_ytdlp,
         ])
         .run(tauri::generate_context!())
         .expect("error while running desound");

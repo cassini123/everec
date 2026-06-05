@@ -2,10 +2,12 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import fs from "node:fs";
 import path from "node:path";
-import { parseWebUrl, analyzeImageLocal, computeGraphLayout } from "@everec/shared";
+import { parseWebUrl, analyzeImageLocal, computeGraphLayout, listStyleDataset } from "@everec/shared";
 import { analyzeImage, analyzeVideo, buildStyleGuide } from "./analyze";
 import {
+  buildProjectDocumentFromGraph,
   exportGraphJson,
+  getGraphStoreInfo,
   graphRebuildFromProject,
   graphSyncImageAnalysis,
   graphSyncVideoAnalysis,
@@ -33,9 +35,15 @@ app.onError((err, c) => {
   return c.json({ error: err.message || "服务器内部错误" }, 500);
 });
 
-app.get("/health", (c) =>
-  c.json({ ok: true, product: "knowgo", platform: "web" }),
-);
+app.get("/health", (c) => {
+  const graph = getGraphStoreInfo();
+  return c.json({ ok: true, product: "knowgo", platform: "web", graphStore: graph.backend });
+});
+
+app.get("/style-dataset", (c) => {
+  const category = c.req.query("category") as import("@everec/shared").StyleDatasetCategory | undefined;
+  return c.json(listStyleDataset(category));
+});
 
 app.get("/projects", (c) => c.json(listProjects()));
 
@@ -92,6 +100,15 @@ app.get("/projects/:id/graph/export", (c) => {
   c.header("Content-Type", "application/json");
   c.header("Content-Disposition", `attachment; filename="knowgo-graph-${project.id}.json"`);
   return c.body(exportGraphJson(project.id));
+});
+
+app.post("/projects/:id/document/from-graph", async (c) => {
+  const project = getProject(c.req.param("id"));
+  if (!project) return c.json({ error: "not found" }, 404);
+  const document = buildProjectDocumentFromGraph(project);
+  const updated = updateProject(project.id, { document });
+  if (!updated) return c.json({ error: "update failed" }, 500);
+  return c.json({ document, project: updated });
 });
 
 app.post("/parse-url", async (c) => {

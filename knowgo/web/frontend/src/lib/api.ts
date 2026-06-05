@@ -116,6 +116,17 @@ export const api = {
     const q = type ? `?type=${encodeURIComponent(type)}` : "";
     return json<ProjectGraph>(`${BASE}/projects/${projectId}/graph/query${q}`);
   },
+
+  documentFromGraph: (projectId: string) =>
+    json<{ document: InspirationDocument; project: KnowgoProject }>(
+      `${BASE}/projects/${projectId}/document/from-graph`,
+      { method: "POST" },
+    ),
+
+  listStyleDataset: (category?: string) => {
+    const q = category ? `?category=${encodeURIComponent(category)}` : "";
+    return json<import("@everec/shared").StyleDatasetEntry[]>(`${BASE}/style-dataset${q}`);
+  },
 };
 
 export function getStoredApiKey(): string {

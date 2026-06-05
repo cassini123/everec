@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Download,
+  ExternalLink,
   GitBranch,
   Loader2,
   RefreshCw,
@@ -10,17 +11,20 @@ import {
 import {
   GRAPH_EDGE_LABELS,
   GRAPH_NODE_COLORS,
+  workspaceForNodeType,
   type GraphLayoutNode,
   type GraphNode,
   type KnowgoProject,
+  type KnowgoWorkspace,
 } from "../types";
 import { api } from "../lib/api";
 
 interface GraphViewProps {
   project: KnowgoProject;
+  onNavigate: (workspace: KnowgoWorkspace, refId?: string) => void;
 }
 
-export function GraphView({ project }: GraphViewProps) {
+export function GraphView({ project, onNavigate }: GraphViewProps) {
   const [layout, setLayout] = useState<GraphLayoutNode[]>([]);
   const [edges, setEdges] = useState<{ from: GraphLayoutNode; to: GraphLayoutNode; type: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -238,7 +242,27 @@ export function GraphView({ project }: GraphViewProps) {
                 ref: <span className="font-mono">{selected.refId}</span>
               </div>
             )}
+            {selected.props.fromStyleDataset === true && (
+              <span className="inline-block rounded bg-kg-purple/20 px-2 py-0.5 text-[10px] text-kg-purple">
+                Style Dataset
+              </span>
+            )}
             <div className="text-xs text-kg-muted">v{selected.version}</div>
+            {workspaceForNodeType(selected.type) !== "graph" && (
+              <button
+                type="button"
+                onClick={() => {
+                  const ws = workspaceForNodeType(selected.type);
+                  const refId =
+                    selected.type === "Asset" ? selected.refId : undefined;
+                  onNavigate(ws, refId);
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-kg-accent px-3 py-2 text-xs font-medium text-kg-bg hover:bg-kg-accent-dim"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                跳转到 {workspaceForNodeType(selected.type)}
+              </button>
+            )}
             <pre className="max-h-64 overflow-auto rounded-lg bg-kg-bg p-3 font-mono text-[10px] leading-relaxed text-kg-muted">
               {JSON.stringify(selected.props, null, 2)}
             </pre>

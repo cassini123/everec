@@ -8,3 +8,6 @@ export * from "./knowgo/urlParse";
 export * from "./knowgo/analyzeLocal";
 export * from "./knowgo/graph";
 export * from "./knowgo/graphSync";
+export * from "./knowgo/styleDataset";
+export * from "./knowgo/datasetSync";
+export * from "./knowgo/documentFromGraph";

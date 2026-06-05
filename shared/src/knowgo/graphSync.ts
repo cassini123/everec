@@ -385,7 +385,8 @@ export function computeGraphLayout(graph: ProjectGraph): import("./graph").Graph
 
   const byLayer = new Map<number, GraphNode[]>();
   for (const node of graph.nodes) {
-    const li = layerIndex.get(node.type) ?? 4;
+    let li = layerIndex.get(node.type) ?? 4;
+    if (node.props.fromStyleDataset === true) li = Math.min(li + 1, 4);
     if (!byLayer.has(li)) byLayer.set(li, []);
     byLayer.get(li)!.push(node);
   }

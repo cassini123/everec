@@ -8,6 +8,7 @@ import { DocumentView } from "./views/DocumentView";
 import { StyleView } from "./views/StyleView";
 import { GraphView } from "./views/GraphView";
 import { api, getStoredApiKey, setStoredApiKey } from "./lib/api";
+import { setGraphNavigation } from "./lib/graphNav";
 import type { KnowgoProject, KnowgoWorkspace } from "./types";
 
 export default function App() {
@@ -48,6 +49,11 @@ export default function App() {
     const p = await api.createProject(`项目 ${new Date().toLocaleDateString("zh-CN")}`);
     setProject(p);
     setWorkspace("brief");
+  };
+
+  const handleGraphNavigate = (ws: KnowgoWorkspace, refId?: string) => {
+    setGraphNavigation(ws, refId);
+    setWorkspace(ws);
   };
 
   if (loading) {
@@ -100,7 +106,9 @@ export default function App() {
           {workspace === "style" && (
             <StyleView project={project} onUpdate={setProject} />
           )}
-          {workspace === "graph" && <GraphView project={project} />}
+          {workspace === "graph" && (
+            <GraphView project={project} onNavigate={handleGraphNavigate} />
+          )}
         </main>
       </div>
 

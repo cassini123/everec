@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Clapperboard,
   Film,
@@ -14,6 +14,7 @@ import type {
   VideoAnalysis,
 } from "../types";
 import { api, saveStyleGuide } from "../lib/api";
+import { consumeGraphNavigation } from "../lib/graphNav";
 
 interface AnalyzeViewProps {
   project: KnowgoProject;
@@ -30,6 +31,13 @@ export function AnalyzeView({ project, apiKey, onUpdate }: AnalyzeViewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [durationSec, setDurationSec] = useState(60);
+
+  useEffect(() => {
+    const nav = consumeGraphNavigation();
+    if (nav.workspace === "analyze" && nav.refId) {
+      setSelectedId(nav.refId);
+    }
+  }, [project.id]);
 
   const selected = project.captures.find((c) => c.id === selectedId);
 

@@ -21,8 +21,9 @@ Knowgo 将 Brief、素材、分析、分镜、风格决策写入 **Project Graph
 
 - 节点：Project、Brief、Asset、Analysis、Shot、StyleTag、Font、ReferenceFilm 等
 - 边：derived_from、evidences、similar_to、implements、constrains 等
-- 存储：`data/knowgo/graphs/{projectId}.json`（Phase 1，后续迁移 SQLite）
-- API：`GET /api/knowgo/projects/:id/graph`
+- 存储：本地 **SQLite**（`data/knowgo/project-graph.db`）；Vercel / `KNOWGO_GRAPH_STORE=json` 时回退 JSON
+- **Style Dataset**：20+ 全局风格 seed，分析时自动 `similar_to` 匹配
+- API：`GET /api/knowgo/style-dataset`、`POST /projects/:id/document/from-graph`
 
 ## 目录结构
 

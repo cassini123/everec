@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { ImagePlus, Save, Video } from "lucide-react";
+import { GitBranch, ImagePlus, Save, Video } from "lucide-react";
 import type { DocumentSection, InspirationDocument, KnowgoProject } from "../types";
-import { saveDocument } from "../lib/api";
+import { api, saveDocument } from "../lib/api";
 
 interface DocumentViewProps {
   project: KnowgoProject;
@@ -44,6 +44,19 @@ export function DocumentView({ project, onUpdate }: DocumentViewProps) {
       setTimeout(() => setSaved(false), 2000);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const [syncing, setSyncing] = useState(false);
+
+  const syncFromGraph = async () => {
+    setSyncing(true);
+    try {
+      const { document, project: updated } = await api.documentFromGraph(project.id);
+      setDoc(document);
+      onUpdate(updated);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -109,10 +122,19 @@ export function DocumentView({ project, onUpdate }: DocumentViewProps) {
         <div className="flex gap-2">
           <button
             type="button"
+            onClick={syncFromGraph}
+            disabled={syncing}
+            className="flex items-center gap-1.5 rounded-lg border border-kg-accent/40 bg-kg-accent/10 px-4 py-2 text-xs text-kg-accent hover:bg-kg-accent/20 disabled:opacity-50"
+          >
+            <GitBranch className="h-3.5 w-3.5" />
+            {syncing ? "同步中…" : "从 Project Graph 生成"}
+          </button>
+          <button
+            type="button"
             onClick={syncFromAnalysis}
             className="rounded-lg border border-kg-border px-4 py-2 text-xs hover:bg-kg-elevated"
           >
-            从 Brief / 风格同步
+            从 Brief / 风格同步（旧）
           </button>
           <button
             type="button"

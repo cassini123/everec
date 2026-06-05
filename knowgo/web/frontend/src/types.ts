@@ -22,6 +22,6 @@ export type {
   GraphQueryResult,
 } from "@everec/shared";
 
-export { GRAPH_NODE_COLORS, GRAPH_EDGE_LABELS } from "@everec/shared";
+export { GRAPH_NODE_COLORS, GRAPH_EDGE_LABELS, workspaceForNodeType } from "@everec/shared";
 
 export type { GraphResponse } from "./graphTypes";

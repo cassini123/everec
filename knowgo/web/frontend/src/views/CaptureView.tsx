@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClipboardPaste, ExternalLink, ImagePlus, Link2, Loader2, Video } from "lucide-react";
 import type { InspirationCapture, KnowgoProject } from "../types";
 import { api } from "../lib/api";
+import { consumeGraphNavigation } from "../lib/graphNav";
 
 interface CaptureViewProps {
   project: KnowgoProject;
@@ -14,6 +15,14 @@ export function CaptureView({ project, onUpdate }: CaptureViewProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<{ title: string; description: string; imageUrl?: string } | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const nav = consumeGraphNavigation();
+    if (nav.workspace === "capture" && nav.refId) {
+      setHighlightId(nav.refId);
+    }
+  }, [project.id]);
 
   const refresh = async () => {
     const updated = await api.getProject(project.id);
@@ -189,7 +198,7 @@ export function CaptureView({ project, onUpdate }: CaptureViewProps) {
             <p className="p-4 text-center text-sm text-kg-muted">暂无灵感素材</p>
           ) : (
             project.captures.map((c) => (
-              <CaptureCard key={c.id} capture={c} />
+              <CaptureCard key={c.id} capture={c} highlighted={c.id === highlightId} />
             ))
           )}
         </div>
@@ -198,7 +207,7 @@ export function CaptureView({ project, onUpdate }: CaptureViewProps) {
   );
 }
 
-function CaptureCard({ capture }: { capture: InspirationCapture }) {
+function CaptureCard({ capture, highlighted }: { capture: InspirationCapture; highlighted?: boolean }) {
   const icon =
     capture.type === "url" ? (
       <ExternalLink className="h-3.5 w-3.5" />
@@ -209,7 +218,7 @@ function CaptureCard({ capture }: { capture: InspirationCapture }) {
     );
 
   return (
-    <div className="rounded-lg border border-kg-border bg-kg-panel p-3">
+    <div className={`rounded-lg border p-3 ${highlighted ? "border-kg-accent bg-kg-accent/10" : "border-kg-border bg-kg-panel"}`}>
       <div className="flex items-start gap-2">
         <span className="mt-0.5 text-kg-accent">{icon}</span>
         <div className="min-w-0 flex-1">

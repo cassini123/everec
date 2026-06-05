@@ -2177,8 +2177,40 @@ function splitQuery(query) {
   if (titleFirst) return { title: titleFirst[1].trim(), artist: titleFirst[2].trim() };
   const enLast = q.match(/^(.+?)\s+([\u4e00-\u9fff·][\u4e00-\u9fffA-Za-z·]{1,12})$/);
   if (enLast) return { artist: enLast[2].trim(), title: enLast[1].trim() };
+  const enTitleCnArtist = q.match(/^([A-Za-z][A-Za-z0-9\s'.-]+)([\u4e00-\u9fff·][\u4e00-\u9fffA-Za-z·]{1,12})$/);
+  if (enTitleCnArtist) {
+    return { title: enTitleCnArtist[1].trim(), artist: enTitleCnArtist[2].trim() };
+  }
+  const cnArtistEnTitle = q.match(/^([\u4e00-\u9fff·][\u4e00-\u9fffA-Za-z·]{1,12})([A-Za-z].+)$/);
+  if (cnArtistEnTitle) {
+    return { artist: cnArtistEnTitle[1].trim(), title: cnArtistEnTitle[2].trim() };
+  }
   if (!/\s/.test(q)) return { title: "", artist: q };
   return { title: q, artist: "" };
+}
+function extractQueryKeywords(query, hint) {
+  const h = hint ?? splitQuery(query);
+  const seen = /* @__PURE__ */ new Set();
+  const add = (raw2) => {
+    const norm = raw2.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, "").trim();
+    if (norm.length > 1) seen.add(norm);
+  };
+  if (h.artist) add(h.artist);
+  if (h.title) {
+    add(h.title);
+    for (const w of h.title.toLowerCase().split(/\s+/)) add(w);
+  }
+  for (const cn of query.match(/[\u4e00-\u9fff·][\u4e00-\u9fffA-Za-z·]{1,12}/g) ?? []) add(cn);
+  for (const en of query.match(/[A-Za-z][A-Za-z0-9']*/g) ?? []) add(en);
+  return [...seen];
+}
+function countKeywordMatches(item, keywords) {
+  const blob = `${item.title}${item.artist}${item.album ?? ""}`.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, "");
+  let count = 0;
+  for (const kw of keywords) {
+    if (blob.includes(kw)) count++;
+  }
+  return count;
 }
 function cleanSongTitle(title) {
   return title.replace(/^[\s《》「」"']+|[\s《》「」"']+$/g, "").replace(/^\d{4,}\s*/, "").replace(/\s*[\-—–|·]\s*[\u4e00-\u9fff]{6,}.*$/, "").replace(/\s*\([^)]*$/, "").replace(/\s*（[^）]*$/, "").replace(/\s*(live|Live|LIVE|现场|版|cover|Cover).*$/, "").trim();
@@ -2216,24 +2248,27 @@ async function fetchJson(url, referer) {
   }
   throw new Error("HTTP 412");
 }
-function scoreCandidate(query, item) {
-  let score = 0;
+function scoreCandidate(query, item, keywords) {
+  let score = countKeywordMatches(item, keywords) * 200;
   const qt = normalizeSongTitle(query.title);
   const qa = query.artist.toLowerCase().replace(/\s/g, "");
   const title = normalizeSongTitle(item.title);
   const artist = item.artist.toLowerCase().replace(/\s/g, "");
-  if (qt && title === qt) score += 120;
-  else if (qt && title.includes(qt)) score += 80;
-  if (qa && artist.includes(qa)) score += 100;
-  if (item.album) score += 40;
-  if (item.previewUrl) score += 30;
-  if (item.album && !/live|现场/i.test(item.album)) score += 20;
-  if (isRemixOrLive(item.title) && !/live|版|dj|remix/i.test(query.title + query.artist)) score -= 80;
+  const titleHit = !!(qt && (title === qt || title.includes(qt) || qt.includes(title)));
+  const artistHit = !!(qa && artist.includes(qa));
+  if (titleHit && artistHit) score += 300;
+  else if (titleHit) score += 80;
+  else if (artistHit) score += 80;
+  if (qa && !artistHit) score -= 120;
+  if (item.album) score += 20;
+  if (item.previewUrl) score += 10;
+  if (item.album && !/live|现场/i.test(item.album)) score += 15;
+  if (isRemixOrLive(item.title) && !/live|版|dj|remix/i.test(query.title + query.artist)) score -= 60;
   if (item.album && /live|现场/i.test(item.album) && !/live|现场/i.test(query.title + query.artist)) {
-    score -= 70;
+    score -= 50;
   }
-  if (/\([^)]*$/.test(item.title) || /（[^）]*$/.test(item.title)) score -= 30;
-  if (item.durationMs > 0) score += 10;
+  if (/\([^)]*$/.test(item.title) || /（[^）]*$/.test(item.title)) score -= 20;
+  if (item.durationMs > 0) score += 5;
   return score;
 }
 function isRelevantResult(item, query) {
@@ -2269,8 +2304,7 @@ function itunesArtworkUrl(raw2) {
   if (!url) return void 0;
   return url.replace(/(\d+)x\1bb\.(jpg|png)/i, "600x600bb.$2");
 }
-async function searchItunes(query, limit) {
-  const hint = splitQuery(query);
+async function searchItunes(query, limit, _hint) {
   const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=${limit}&country=CN`;
   const data = await fetchJson(url);
   const results = [];
@@ -2283,9 +2317,6 @@ async function searchItunes(query, limit) {
     const artist = cleanArtist(String(item.artistName ?? "Unknown"));
     const album = String(item.collectionName ?? "").trim();
     if (!album) continue;
-    if (hint.artist && !artist.toLowerCase().includes(hint.artist.toLowerCase().replace(/\s/g, ""))) {
-      if (hint.title && !title.toLowerCase().includes(hint.title.toLowerCase().replace(/\s/g, ""))) continue;
-    }
     results.push({
       id: `itunes:${id}`,
       title,
@@ -2299,7 +2330,7 @@ async function searchItunes(query, limit) {
   }
   return results;
 }
-function dedupeOnePerSong(items, query) {
+function dedupeOnePerSong(items, query, keywords) {
   const best = /* @__PURE__ */ new Map();
   for (const item of items) {
     const key = songKey(item.title, item.artist, query);
@@ -2309,19 +2340,27 @@ function dedupeOnePerSong(items, query) {
       continue;
     }
     const merged = mergeResult(
-      scoreCandidate(query, item) >= scoreCandidate(query, prev) ? item : prev,
-      scoreCandidate(query, item) >= scoreCandidate(query, prev) ? prev : item
+      scoreCandidate(query, item, keywords) >= scoreCandidate(query, prev, keywords) ? item : prev,
+      scoreCandidate(query, item, keywords) >= scoreCandidate(query, prev, keywords) ? prev : item
     );
     best.set(key, merged);
   }
-  return [...best.values()].sort((a, b) => scoreCandidate(query, b) - scoreCandidate(query, a));
+  return [...best.values()].sort(
+    (a, b) => scoreCandidate(query, b, keywords) - scoreCandidate(query, a, keywords)
+  );
 }
 async function searchMusicOnline(query, limit = 20) {
   const q = query.trim();
   if (!q) throw new Error("\u8BF7\u8F93\u5165\u641C\u7D22\u5173\u952E\u8BCD");
   const hint = splitQuery(q);
-  const itunes = await searchItunes(q, limit * 2).catch(() => []);
-  const merged = dedupeOnePerSong(itunes, hint);
+  const keywords = extractQueryKeywords(q, hint);
+  const searchTerm = hint.artist && hint.title ? `${hint.artist} ${hint.title}`.trim() : hint.artist || hint.title || q;
+  const [broad, focused] = await Promise.all([
+    searchItunes(q, limit * 3, hint).catch(() => []),
+    searchTerm !== q ? searchItunes(searchTerm, limit * 3, hint).catch(() => []) : Promise.resolve([])
+  ]);
+  const itunes = [...focused, ...broad];
+  const merged = dedupeOnePerSong(itunes, hint, keywords);
   const relevant = merged.filter((item) => isRelevantResult(item, hint));
   const picked = (relevant.length ? relevant : merged).slice(0, limit);
   if (!picked.length) throw new Error("\u672A\u627E\u5230\u76F8\u5173\u6B4C\u66F2\uFF0C\u8BF7\u6362\u5173\u952E\u8BCD\u6216\u4E0A\u4F20\u672C\u5730\u6587\u4EF6");

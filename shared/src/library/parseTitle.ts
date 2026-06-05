@@ -28,10 +28,61 @@ export function splitQuery(query: string): { title: string; artist: string } {
   const enLast = q.match(/^(.+?)\s+([\u4e00-\u9fff·][\u4e00-\u9fffA-Za-z·]{1,12})$/);
   if (enLast) return { artist: enLast[2]!.trim(), title: enLast[1]!.trim() };
 
+  // 歌名+歌手连写：dont break my heart窦靖童
+  const enTitleCnArtist = q.match(/^([A-Za-z][A-Za-z0-9\s'.-]+)([\u4e00-\u9fff·][\u4e00-\u9fffA-Za-z·]{1,12})$/);
+  if (enTitleCnArtist) {
+    return { title: enTitleCnArtist[1]!.trim(), artist: enTitleCnArtist[2]!.trim() };
+  }
+
+  // 歌手+歌名连写：窦靖童dont break my heart
+  const cnArtistEnTitle = q.match(/^([\u4e00-\u9fff·][\u4e00-\u9fffA-Za-z·]{1,12})([A-Za-z].+)$/);
+  if (cnArtistEnTitle) {
+    return { artist: cnArtistEnTitle[1]!.trim(), title: cnArtistEnTitle[2]!.trim() };
+  }
+
   // 单词搜索视为歌手名，如「窦靖童」
   if (!/\s/.test(q)) return { title: "", artist: q };
 
   return { title: q, artist: "" };
+}
+
+/** 从搜索词提取用于匹配打分的关键词 */
+export function extractQueryKeywords(query: string, hint?: { title: string; artist: string }): string[] {
+  const h = hint ?? splitQuery(query);
+  const seen = new Set<string>();
+  const add = (raw: string) => {
+    const norm = raw
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fff]/g, "")
+      .trim();
+    if (norm.length > 1) seen.add(norm);
+  };
+
+  if (h.artist) add(h.artist);
+  if (h.title) {
+    add(h.title);
+    for (const w of h.title.toLowerCase().split(/\s+/)) add(w);
+  }
+
+  // 连写或未拆分时，从原文补中文片段
+  for (const cn of query.match(/[\u4e00-\u9fff·][\u4e00-\u9fffA-Za-z·]{1,12}/g) ?? []) add(cn);
+  for (const en of query.match(/[A-Za-z][A-Za-z0-9']*/g) ?? []) add(en);
+
+  return [...seen];
+}
+
+export function countKeywordMatches(
+  item: { title: string; artist: string; album?: string },
+  keywords: string[],
+): number {
+  const blob = `${item.title}${item.artist}${item.album ?? ""}`
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fff]/g, "");
+  let count = 0;
+  for (const kw of keywords) {
+    if (blob.includes(kw)) count++;
+  }
+  return count;
 }
 
 export function cleanRawTitle(raw: string): string {

@@ -3,6 +3,8 @@ import { USER_AGENT } from "../constants";
 import {
   cleanArtist,
   cleanSongTitle,
+  countKeywordMatches,
+  extractQueryKeywords,
   formatResultLabel,
   isRemixOrLive,
   normalizeSongTitle,
@@ -28,25 +30,32 @@ async function fetchJson<T>(url: string, referer?: string): Promise<T> {
 function scoreCandidate(
   query: { title: string; artist: string },
   item: MusicSearchResult,
+  keywords: string[],
 ): number {
-  let score = 0;
+  let score = countKeywordMatches(item, keywords) * 200;
+
   const qt = normalizeSongTitle(query.title);
   const qa = query.artist.toLowerCase().replace(/\s/g, "");
   const title = normalizeSongTitle(item.title);
   const artist = item.artist.toLowerCase().replace(/\s/g, "");
+  const titleHit = !!(qt && (title === qt || title.includes(qt) || qt.includes(title)));
+  const artistHit = !!(qa && artist.includes(qa));
 
-  if (qt && title === qt) score += 120;
-  else if (qt && title.includes(qt)) score += 80;
-  if (qa && artist.includes(qa)) score += 100;
-  if (item.album) score += 40;
-  if (item.previewUrl) score += 30;
-  if (item.album && !/live|现场/i.test(item.album)) score += 20;
-  if (isRemixOrLive(item.title) && !/live|版|dj|remix/i.test(query.title + query.artist)) score -= 80;
+  if (titleHit && artistHit) score += 300;
+  else if (titleHit) score += 80;
+  else if (artistHit) score += 80;
+
+  if (qa && !artistHit) score -= 120;
+
+  if (item.album) score += 20;
+  if (item.previewUrl) score += 10;
+  if (item.album && !/live|现场/i.test(item.album)) score += 15;
+  if (isRemixOrLive(item.title) && !/live|版|dj|remix/i.test(query.title + query.artist)) score -= 60;
   if (item.album && /live|现场/i.test(item.album) && !/live|现场/i.test(query.title + query.artist)) {
-    score -= 70;
+    score -= 50;
   }
-  if (/\([^)]*$/.test(item.title) || /（[^）]*$/.test(item.title)) score -= 30;
-  if (item.durationMs > 0) score += 10;
+  if (/\([^)]*$/.test(item.title) || /（[^）]*$/.test(item.title)) score -= 20;
+  if (item.durationMs > 0) score += 5;
   return score;
 }
 
@@ -98,8 +107,11 @@ function itunesArtworkUrl(raw?: unknown): string | undefined {
   return url.replace(/(\d+)x\1bb\.(jpg|png)/i, "600x600bb.$2");
 }
 
-async function searchItunes(query: string, limit: number): Promise<MusicSearchResult[]> {
-  const hint = splitQuery(query);
+async function searchItunes(
+  query: string,
+  limit: number,
+  _hint: { title: string; artist: string },
+): Promise<MusicSearchResult[]> {
   const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=${limit}&country=CN`;
   const data = await fetchJson<{ results?: Record<string, unknown>[] }>(url);
   const results: MusicSearchResult[] = [];
@@ -115,10 +127,6 @@ async function searchItunes(query: string, limit: number): Promise<MusicSearchRe
     const artist = cleanArtist(String(item.artistName ?? "Unknown"));
     const album = String(item.collectionName ?? "").trim();
     if (!album) continue;
-
-    if (hint.artist && !artist.toLowerCase().includes(hint.artist.toLowerCase().replace(/\s/g, ""))) {
-      if (hint.title && !title.toLowerCase().includes(hint.title.toLowerCase().replace(/\s/g, ""))) continue;
-    }
 
     results.push({
       id: `itunes:${id}`,
@@ -138,6 +146,7 @@ async function searchItunes(query: string, limit: number): Promise<MusicSearchRe
 function dedupeOnePerSong(
   items: MusicSearchResult[],
   query: { title: string; artist: string },
+  keywords: string[],
 ): MusicSearchResult[] {
   const best = new Map<string, MusicSearchResult>();
 
@@ -149,13 +158,15 @@ function dedupeOnePerSong(
       continue;
     }
     const merged = mergeResult(
-      scoreCandidate(query, item) >= scoreCandidate(query, prev) ? item : prev,
-      scoreCandidate(query, item) >= scoreCandidate(query, prev) ? prev : item,
+      scoreCandidate(query, item, keywords) >= scoreCandidate(query, prev, keywords) ? item : prev,
+      scoreCandidate(query, item, keywords) >= scoreCandidate(query, prev, keywords) ? prev : item,
     );
     best.set(key, merged);
   }
 
-  return [...best.values()].sort((a, b) => scoreCandidate(query, b) - scoreCandidate(query, a));
+  return [...best.values()].sort(
+    (a, b) => scoreCandidate(query, b, keywords) - scoreCandidate(query, a, keywords),
+  );
 }
 
 export async function searchMusicOnline(query: string, limit = 20): Promise<MusicSearchResult[]> {
@@ -163,8 +174,15 @@ export async function searchMusicOnline(query: string, limit = 20): Promise<Musi
   if (!q) throw new Error("请输入搜索关键词");
 
   const hint = splitQuery(q);
-  const itunes = await searchItunes(q, limit * 2).catch(() => []);
-  const merged = dedupeOnePerSong(itunes, hint);
+  const keywords = extractQueryKeywords(q, hint);
+  const searchTerm =
+    hint.artist && hint.title ? `${hint.artist} ${hint.title}`.trim() : hint.artist || hint.title || q;
+  const [broad, focused] = await Promise.all([
+    searchItunes(q, limit * 3, hint).catch(() => []),
+    searchTerm !== q ? searchItunes(searchTerm, limit * 3, hint).catch(() => [] as MusicSearchResult[]) : Promise.resolve([]),
+  ]);
+  const itunes = [...focused, ...broad];
+  const merged = dedupeOnePerSong(itunes, hint, keywords);
   const relevant = merged.filter((item) => isRelevantResult(item, hint));
   const picked = (relevant.length ? relevant : merged).slice(0, limit);
 

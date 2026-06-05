@@ -5,6 +5,8 @@ export * from "./library/resolve";
 export * from "./library/parseTitle";
 export * from "./library/sfxSearch";
 export * from "./instruments/webInstruments";
+export * from "./media/types";
+export * from "./media/extract";
 export * from "./knowgo/types";
 export * from "./knowgo/urlParse";
 export * from "./knowgo/analyzeLocal";

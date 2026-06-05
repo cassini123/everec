@@ -191,12 +191,18 @@ export const api = {
       body: JSON.stringify(result),
     }),
 
-  saveLinkResult: (link: LinkParseResult) =>
+  saveLinkResult: (link: LinkParseResult & { downloadUrl?: string; referer?: string; ext?: string }) =>
     request<SoundAsset>("/library/import-link", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(link),
     }),
+
+  getMediaProxyUrl: (url: string, referer?: string) => {
+    const params = new URLSearchParams({ url });
+    if (referer) params.set("referer", referer);
+    return `${API}/media/proxy?${params.toString()}`;
+  },
 
   getAudioUrl: (soundId: string) => `/api/library/sounds/${soundId}/audio`,
 };

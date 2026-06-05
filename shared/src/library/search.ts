@@ -1,6 +1,12 @@
 import type { LinkParseResult, MusicSearchResult } from "../types";
 import { USER_AGENT } from "../constants";
-import { extractUrlFromText, parseWebUrl } from "../knowgo/urlParse";
+import {
+  detectMediaPlatform,
+  extractMedia,
+  extractUrlFromText,
+  pickPrimaryAudio,
+  pickPrimaryVideo,
+} from "../media/extract";
 import {
   cleanArtist,
   cleanSongTitle,
@@ -194,58 +200,24 @@ export async function searchMusicOnline(query: string, limit = 20): Promise<Musi
 export { formatResultLabel };
 
 export function detectPlatform(url: string): string | null {
-  const lower = url.toLowerCase();
-  if (lower.includes("bilibili.com") || lower.includes("b23.tv")) return "bilibili";
-  if (lower.includes("douyin.com") || lower.includes("iesdouyin.com")) return "douyin";
-  if (lower.includes("xiaohongshu.com") || lower.includes("xhslink.com")) return "xiaohongshu";
-  return null;
+  const platform = detectMediaPlatform(url);
+  return platform === "unknown" ? null : platform;
 }
 
-function extractBvid(url: string): string | null {
-  const match = url.match(/BV[a-zA-Z0-9]+/);
-  return match ? match[0] : null;
-}
-
-async function parseBilibili(url: string): Promise<LinkParseResult> {
-  const bvid = extractBvid(url);
-  if (!bvid) throw new Error("无法识别 Bilibili 视频链接");
-
-  const info = await fetchJson<{ code?: number; message?: string; data?: Record<string, unknown> }>(
-    `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
-    "https://www.bilibili.com",
-  );
-  if (info.code !== 0) throw new Error(info.message ?? "Bilibili API 错误");
-
-  const data = info.data!;
-  const cid = Number(data.cid);
-  const play = await fetchJson<{
-    data?: { dash?: { audio?: { baseUrl?: string; base_url?: string }[] } };
-  }>(
-    `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${cid}&fnval=16&qn=0`,
-    "https://www.bilibili.com",
-  );
-  const audio = play.data?.dash?.audio?.[0];
-
+function toLinkParseResult(result: Awaited<ReturnType<typeof extractMedia>>): LinkParseResult {
+  const video = pickPrimaryVideo(result);
+  const audio = pickPrimaryAudio(result);
   return {
-    platform: "bilibili",
-    title: String(data.title ?? "Bilibili 视频"),
-    author: String((data.owner as { name?: string })?.name ?? ""),
-    durationSec: Number(data.duration ?? 0),
-    coverUrl: data.pic ? String(data.pic) : undefined,
-    audioUrl: audio?.baseUrl ?? audio?.base_url,
-    originalUrl: url,
-  };
-}
-
-function toLinkParseResult(parsed: Awaited<ReturnType<typeof parseWebUrl>>, originalUrl: string): LinkParseResult {
-  return {
-    platform: parsed.platform,
-    title: parsed.title,
-    author: parsed.author ?? "",
-    durationSec: parsed.durationSec ?? 0,
-    coverUrl: parsed.imageUrl,
-    audioUrl: parsed.videoUrl,
-    originalUrl: parsed.resolvedUrl ?? originalUrl,
+    platform: result.platform,
+    title: result.title,
+    author: result.author ?? "",
+    durationSec: result.durationSec ?? 0,
+    coverUrl: result.coverUrl ?? result.downloads.find((d) => d.kind === "image")?.url,
+    videoUrl: video?.url,
+    audioUrl: audio?.url ?? video?.url,
+    originalUrl: result.resolvedUrl ?? result.url,
+    mediaType: result.mediaType,
+    downloads: result.downloads,
   };
 }
 
@@ -257,27 +229,9 @@ export async function parseMediaUrl(url: string): Promise<LinkParseResult> {
   }
 
   const platform = detectPlatform(trimmed);
-  if (platform === "bilibili") {
-    try {
-      return await parseBilibili(trimmed);
-    } catch {
-      try {
-        return toLinkParseResult(await parseWebUrl(trimmed), trimmed);
-      } catch {
-        return {
-          platform: "bilibili",
-          title: "Bilibili 视频",
-          author: "",
-          durationSec: 0,
-          originalUrl: trimmed,
-        };
-      }
-    }
-  }
-  if (platform === "douyin" || platform === "xiaohongshu") {
-    return toLinkParseResult(await parseWebUrl(trimmed), trimmed);
-  }
-  throw new Error("暂不支持该平台，目前支持: Bilibili、抖音、小红书");
+  if (!platform) throw new Error("暂不支持该平台");
+
+  return toLinkParseResult(await extractMedia(trimmed));
 }
 
 export function formatDurationMs(ms: number): string {

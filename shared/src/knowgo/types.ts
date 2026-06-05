@@ -46,6 +46,8 @@ export interface InspirationCapture {
   createdAt: string;
 }
 
+import type { MediaDownloadItem } from "../media/types";
+
 export interface UrlParseResult {
   url: string;
   resolvedUrl?: string;
@@ -58,6 +60,7 @@ export interface UrlParseResult {
   author?: string;
   durationSec?: number;
   mediaType?: "video" | "image" | "article";
+  downloads?: MediaDownloadItem[];
 }
 
 export interface ImageAnalysis {

@@ -10,7 +10,9 @@ export async function saveSearchResultToLibrary(result: MusicSearchResult): Prom
   return api.saveSearchResult(result);
 }
 
-export async function saveLinkToLibrary(link: LinkParseResult): Promise<SoundAsset> {
+export async function saveLinkToLibrary(
+  link: LinkParseResult & { downloadUrl?: string; referer?: string; ext?: string },
+): Promise<SoundAsset> {
   return api.saveLinkResult(link);
 }
 

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import fs from "node:fs";
 import path from "node:path";
-import { searchMusicOnline, parseMediaUrl, resolveMusicAudioUrl, searchSfxOnline } from "@everec/shared";
+import { searchMusicOnline, parseMediaUrl, resolveMusicAudioUrl, searchSfxOnline, extractMedia } from "@everec/shared";
 import {
   listSounds,
   getSound,
@@ -221,6 +221,10 @@ app.post("/library/import-link", async (c) => {
     platform: string;
     title: string;
     audioUrl?: string;
+    videoUrl?: string;
+    downloadUrl?: string;
+    referer?: string;
+    ext?: string;
     originalUrl: string;
   }>();
   const tags = ["bgm", link.platform];
@@ -228,26 +232,24 @@ app.post("/library/import-link", async (c) => {
   const tmp = tempDir();
 
   try {
-    if (link.platform === "bilibili" && link.audioUrl) {
-      const ext = link.audioUrl.includes(".m4a") ? "m4a" : "mp3";
-      const dest = path.join(tmp, `bilibili.${ext}`);
-      await downloadHttp(link.audioUrl, dest, "https://www.bilibili.com");
-      return c.json(importFile(dest, link.title, tags, "music", sourceLabel));
-    }
-    if (
-      (link.platform === "xiaohongshu" || link.platform === "douyin") &&
-      link.audioUrl?.startsWith("http")
-    ) {
-      const ext = link.audioUrl.includes(".mp4") ? "mp4" : "mp3";
+    const mediaUrl = link.downloadUrl ?? link.videoUrl ?? link.audioUrl;
+    if (mediaUrl?.startsWith("http")) {
+      const ext =
+        link.ext ??
+        (mediaUrl.includes(".mp4") ? "mp4" : mediaUrl.includes(".m4a") ? "m4a" : mediaUrl.includes(".webm") ? "webm" : "mp3");
       const dest = path.join(tmp, `${link.platform}.${ext}`);
-      await downloadHttp(link.audioUrl, dest);
+      const referer =
+        link.referer ??
+        (link.platform === "bilibili"
+          ? "https://www.bilibili.com"
+          : link.platform === "douyin"
+            ? "https://www.douyin.com"
+            : undefined);
+      await downloadHttp(mediaUrl, dest, referer);
       return c.json(importFile(dest, link.title, tags, "music", sourceLabel));
     }
     if (process.env.VERCEL) {
-      return c.json(
-        { error: "未能获取可下载的媒体地址，请确认链接有效或换用 Bilibili / iTunes 搜索" },
-        400,
-      );
+      return c.json({ error: "未能获取可下载的媒体地址，请确认链接有效" }, 400);
     }
     const downloaded = downloadWithYtDlp(link.originalUrl, tmp);
     return c.json(
@@ -263,6 +265,37 @@ app.post("/library/import-link", async (c) => {
     return c.json({ error: String(err) }, 500);
   } finally {
     cleanupTemp();
+  }
+});
+
+app.get("/media/proxy", async (c) => {
+  const mediaUrl = c.req.query("url");
+  const referer = c.req.query("referer");
+  if (!mediaUrl?.startsWith("http")) return c.json({ error: "无效 URL" }, 400);
+  try {
+    const headers: Record<string, string> = {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    };
+    if (referer) headers.Referer = referer;
+    const res = await fetch(mediaUrl, { headers, redirect: "follow" });
+    if (!res.ok) return c.json({ error: `下载失败: HTTP ${res.status}` }, 502);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const contentType = res.headers.get("content-type") ?? "application/octet-stream";
+    c.header("Content-Type", contentType);
+    c.header("Cache-Control", "public, max-age=300");
+    return c.body(buffer);
+  } catch (err) {
+    return c.json({ error: String(err) }, 502);
+  }
+});
+
+app.post("/media/extract", async (c) => {
+  const { url } = await c.req.json<{ url: string }>();
+  try {
+    return c.json(await extractMedia(url));
+  } catch (err) {
+    return c.json({ error: String(err) }, 400);
   }
 });
 

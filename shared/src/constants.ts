@@ -13,6 +13,14 @@ export const PLATFORM_LABELS: Record<string, string> = {
   bilibili: "Bilibili",
   douyin: "抖音",
   xiaohongshu: "小红书",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  instagram: "Instagram",
+  twitter: "Twitter / X",
+  facebook: "Facebook",
+  vimeo: "Vimeo",
+  weibo: "微博",
+  kuaishou: "快手",
   itunes: "iTunes",
 };
 

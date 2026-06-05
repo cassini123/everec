@@ -78,6 +78,15 @@ export interface SfxSearchResult {
   durationMs?: number;
 }
 
+export interface MediaDownloadItem {
+  url: string;
+  label: string;
+  ext: string;
+  kind: "video" | "audio" | "image";
+  noWatermark?: boolean;
+  referer?: string;
+}
+
 export interface LinkParseResult {
   platform: string;
   title: string;
@@ -85,7 +94,10 @@ export interface LinkParseResult {
   durationSec: number;
   coverUrl?: string;
   audioUrl?: string;
+  videoUrl?: string;
   originalUrl: string;
+  mediaType?: "video" | "image" | "carousel" | "audio" | "article";
+  downloads?: MediaDownloadItem[];
 }
 
 export interface SoundDesignResult {

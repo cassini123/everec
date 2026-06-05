@@ -11,6 +11,7 @@ import type {
   DesoundProjectSummary,
   LibraryCategory,
   LinkParseResult,
+  MediaDownloadItem,
   MusicSearchResult,
   SoundAsset,
 } from "@everec/shared";
@@ -211,20 +212,38 @@ export function LibraryView({
     }
   };
 
-  const handleSaveLink = async () => {
+  const handleSaveLink = async (item?: MediaDownloadItem) => {
     if (!linkResult) return;
     setLinkSaving(true);
     try {
-      const asset = await saveLinkToLibrary(linkResult);
+      const asset = await saveLinkToLibrary({
+        ...linkResult,
+        downloadUrl: item?.url ?? linkResult.videoUrl ?? linkResult.audioUrl,
+        referer: item?.referer,
+        ext: item?.ext,
+      });
       await onRefresh();
       showSaveSuccess(asset.name);
-      setLinkResult(null);
-      setLinkUrl("");
+      if (!item) {
+        setLinkResult(null);
+        setLinkUrl("");
+      }
     } catch (err) {
       showToast("error", String(err));
     } finally {
       setLinkSaving(false);
     }
+  };
+
+  const handleBrowserDownload = (item: MediaDownloadItem) => {
+    const href = api.getMediaProxyUrl(item.url, item.referer);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `${linkResult?.title ?? "media"}.${item.ext}`;
+    a.rel = "noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   return (
@@ -496,7 +515,7 @@ export function LibraryView({
                     value={linkUrl}
                     onChange={(e) => setLinkUrl(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleParseLink()}
-                    placeholder="粘贴 Bilibili / 抖音 / 小红书链接…"
+                    placeholder="粘贴视频链接（支持 B站 / 抖音 / 小红书 / TikTok / YouTube / Instagram 等）…"
                     className="w-full rounded-md border border-ds-border bg-ds-bg py-2 pl-9 pr-3 text-sm outline-none focus:border-ds-accent"
                   />
                 </div>
@@ -515,7 +534,7 @@ export function LibraryView({
                 </button>
               </div>
               <p className="mt-2 text-[11px] text-ds-muted">
-                支持 bilibili.com · douyin.com · xiaohongshu.com / xhslink.com
+                支持无水印解析下载：Bilibili · 抖音 · 小红书 · TikTok · YouTube · Instagram · 微博 · 快手等
               </p>
             </div>
 
@@ -523,12 +542,19 @@ export function LibraryView({
               {!linkResult ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 text-ds-muted">
                   <Link2 className="h-12 w-12 opacity-30" />
-                  <p className="text-sm">粘贴视频链接，提取 BGM 保存至素材库</p>
+                  <p className="text-sm">粘贴链接，解析无水印视频 / 图片 / 音频并下载</p>
                 </div>
               ) : (
-                <div className="mx-auto max-w-lg rounded-lg border border-ds-border bg-ds-panel p-5">
+                <div className="mx-auto max-w-2xl rounded-lg border border-ds-border bg-ds-panel p-5">
                   <div className="flex gap-4">
-                    {linkResult.coverUrl ? (
+                    {linkResult.videoUrl ? (
+                      <video
+                        src={api.getMediaProxyUrl(linkResult.videoUrl)}
+                        poster={linkResult.coverUrl}
+                        controls
+                        className="h-32 w-44 shrink-0 rounded object-cover"
+                      />
+                    ) : linkResult.coverUrl ? (
                       <img
                         src={linkResult.coverUrl}
                         alt=""
@@ -548,6 +574,11 @@ export function LibraryView({
                         <span className="rounded bg-ds-accent/20 px-2 py-0.5 text-ds-accent">
                           {PLATFORM_LABELS[linkResult.platform] ?? linkResult.platform}
                         </span>
+                        {linkResult.mediaType && (
+                          <span className="rounded bg-ds-elevated px-2 py-0.5 text-ds-muted">
+                            {linkResult.mediaType}
+                          </span>
+                        )}
                         <span className="rounded bg-ds-elevated px-2 py-0.5 text-ds-muted">
                           {formatDurationSec(linkResult.durationSec)}
                         </span>
@@ -555,21 +586,61 @@ export function LibraryView({
                     </div>
                   </div>
 
-                  <div className="mt-5 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveLink}
-                      disabled={linkSaving}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-md bg-ds-accent py-2.5 text-sm font-medium text-white transition hover:bg-ds-accent-dim disabled:opacity-50"
-                    >
-                      {linkSaving ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Download className="h-4 w-4" />
-                      )}
-                      {linkSaving ? "下载保存中…" : "下载 BGM 至素材库"}
-                    </button>
-                  </div>
+                  {(linkResult.downloads?.length ?? 0) > 0 ? (
+                    <div className="mt-5 space-y-2">
+                      <div className="text-xs font-medium text-ds-muted">可下载资源</div>
+                      {linkResult.downloads!.map((item) => (
+                        <div
+                          key={item.url}
+                          className="flex flex-wrap items-center gap-2 rounded-md border border-ds-border bg-ds-bg px-3 py-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm">{item.label}</div>
+                            <div className="text-[11px] text-ds-muted">
+                              {item.kind.toUpperCase()} · .{item.ext}
+                              {item.noWatermark ? " · 无水印" : ""}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleBrowserDownload(item)}
+                            className="rounded-md border border-ds-border px-3 py-1.5 text-xs hover:bg-ds-panel"
+                          >
+                            浏览器下载
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveLink(item)}
+                            disabled={linkSaving}
+                            className="flex items-center gap-1.5 rounded-md bg-ds-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                          >
+                            {linkSaving ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
+                            保存素材库
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-5 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveLink()}
+                        disabled={linkSaving || !(linkResult.videoUrl || linkResult.audioUrl)}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-md bg-ds-accent py-2.5 text-sm font-medium text-white transition hover:bg-ds-accent-dim disabled:opacity-50"
+                      >
+                        {linkSaving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                        {linkSaving ? "下载保存中…" : "下载至素材库"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

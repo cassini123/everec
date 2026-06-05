@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ClipboardPaste, ExternalLink, ImagePlus, Link2, Loader2, Video } from "lucide-react";
-import type { InspirationCapture, KnowgoProject } from "../types";
+import type { InspirationCapture, KnowgoProject, MediaDownloadItem } from "../types";
 import { api } from "../lib/api";
 import { consumeGraphNavigation } from "../lib/graphNav";
 
@@ -22,7 +22,24 @@ export function CaptureView({ project, onUpdate }: CaptureViewProps) {
     author?: string;
     platform?: string;
     mediaType?: "video" | "image" | "article";
+    downloads?: MediaDownloadItem[];
   } | null>(null);
+
+  const mediaProxyUrl = (itemUrl: string, referer?: string) => {
+    const params = new URLSearchParams({ url: itemUrl });
+    if (referer) params.set("referer", referer);
+    return `/api/media/proxy?${params.toString()}`;
+  };
+
+  const handleBrowserDownload = (item: MediaDownloadItem) => {
+    const a = document.createElement("a");
+    a.href = mediaProxyUrl(item.url, item.referer);
+    a.download = `${preview?.title ?? "media"}.${item.ext}`;
+    a.rel = "noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,6 +77,7 @@ export function CaptureView({ project, onUpdate }: CaptureViewProps) {
         author: parsed.author,
         platform: parsed.platform,
         mediaType: parsed.mediaType,
+        downloads: parsed.downloads,
       });
     } catch (err) {
       setError(String(err));
@@ -154,7 +172,7 @@ export function CaptureView({ project, onUpdate }: CaptureViewProps) {
                 <div className="flex gap-4">
                   {preview.videoUrl ? (
                     <video
-                      src={preview.videoUrl}
+                      src={mediaProxyUrl(preview.videoUrl)}
                       poster={preview.imageUrl}
                       controls
                       className="h-28 w-44 shrink-0 rounded object-cover"
@@ -178,6 +196,21 @@ export function CaptureView({ project, onUpdate }: CaptureViewProps) {
                     <p className="mt-1 line-clamp-3 text-xs text-kg-muted">
                       {preview.description}
                     </p>
+                    {(preview.downloads?.length ?? 0) > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {preview.downloads!.map((item) => (
+                          <button
+                            key={item.url}
+                            type="button"
+                            onClick={() => handleBrowserDownload(item)}
+                            className="block w-full rounded border border-kg-border px-2 py-1.5 text-left text-[11px] hover:bg-kg-bg"
+                          >
+                            下载 {item.label}
+                            {item.noWatermark ? "（无水印）" : ""} · .{item.ext}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

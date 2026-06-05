@@ -4,6 +4,7 @@ export type {
   ProjectBrief,
   InspirationCapture,
   UrlParseResult,
+  MediaDownloadItem,
   ImageAnalysis,
   VideoAnalysis,
   StoryboardShot,

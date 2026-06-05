@@ -405,10 +405,28 @@ fn import_from_http_url(
     tags: Option<Vec<String>>,
     source_label: Option<String>,
     referer: Option<String>,
+    ext: Option<String>,
 ) -> Result<SoundAsset, String> {
     let temp_dir = state.library_dir.join("temp");
     std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
-    let ext = if url.contains(".m4a") { "m4a" } else { "mp3" };
+    let ext = ext
+        .as_deref()
+        .map(|value| value.trim_start_matches('.').to_ascii_lowercase())
+        .filter(|value| value.chars().all(|ch| ch.is_ascii_alphanumeric()))
+        .or_else(|| {
+            if url.contains(".m4a") {
+                Some("m4a".into())
+            } else if url.contains(".wav") {
+                Some("wav".into())
+            } else if url.contains(".ogg") {
+                Some("ogg".into())
+            } else if url.contains(".flac") {
+                Some("flac".into())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| "mp3".into());
     let temp_file = temp_dir.join(format!("download_{}.{}", uuid::Uuid::new_v4(), ext));
     download_http(&url, &temp_file, referer.as_deref())?;
     let mut tag_list = tags.unwrap_or_default();

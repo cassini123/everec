@@ -3037,10 +3037,29 @@ var CN_QUERY_MAP = {
   \u70B9\u51FB: "ui click button",
   \u6309\u94AE: "button click ui",
   \u96E8: "rain ambience",
+  \u4E0B\u96E8: "rain ambience",
   \u96F7\u58F0: "thunder",
+  \u6253\u96F7: "thunder storm",
   \u811A\u6B65: "footsteps walking",
+  \u8D70\u8DEF: "footsteps walking",
   \u5F00\u95E8: "door open creak",
+  \u5173\u95E8: "door close slam",
   \u7206\u70B8: "explosion impact",
+  \u9E1F\u53EB: "bird chirp nature",
+  \u9E1F\u9E23: "bird chirp nature",
+  \u6D77\u6D6A: "ocean waves sea",
+  \u98CE\u58F0: "wind ambience",
+  \u706B\u7130: "fire crackle",
+  \u71C3\u70E7: "fire crackle",
+  \u4EBA\u7FA4: "crowd ambience",
+  \u6C7D\u8F66: "car engine vehicle",
+  \u5239\u8F66: "car brake skid",
+  \u952E\u76D8: "keyboard typing",
+  \u73BB\u7483: "glass break",
+  \u91D1\u5C5E: "metal hit clang",
+  \u6C34\u6EF4: "water drop",
+  \u72D7\u53EB: "dog bark",
+  \u732B\u53EB: "cat meow",
   _whoosh: "whoosh swoosh"
 };
 var CURATED_SFX = [
@@ -3075,6 +3094,10 @@ var CURATED_SFX = [
     source: "mixkit"
   }
 ];
+var SEARCH_TIMEOUT_MS = 1e4;
+var OPENVERSE_API = "https://api.openverse.org/v1/audio/";
+var ARCHIVE_SEARCH_API = "https://archive.org/advancedsearch.php";
+var ARCHIVE_METADATA_API = "https://archive.org/metadata";
 function expandQuery(query) {
   const q = query.trim();
   if (!q) return "";
@@ -3097,6 +3120,133 @@ function scoreSfx(query, item) {
   }
   return score;
 }
+function sourcePriority(source) {
+  if (source.startsWith("openverse")) return 300;
+  if (source.startsWith("archive")) return 250;
+  if (source.startsWith("wikimedia")) return 200;
+  return 50;
+}
+function combinedScore(query, item) {
+  return Math.max(scoreSfx(query, item), scoreSfx(expandQuery(query), item)) + sourcePriority(item.source);
+}
+function cleanTitle(title, fallback = "Sound effect") {
+  return (title ?? fallback).replace(/^File:/, "").replace(/\.[a-z0-9]{2,5}$/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+function isHttpUrl(url) {
+  return !!url && /^https?:\/\//i.test(url);
+}
+function inferFileType(url, explicit) {
+  const fileType = explicit?.toLowerCase().replace(/^\./, "");
+  if (fileType && /^[a-z0-9]+$/.test(fileType)) return fileType;
+  const path8 = url.split("?")[0].split("#")[0];
+  const match2 = path8.match(/\.([a-z0-9]{2,5})$/i);
+  return match2?.[1]?.toLowerCase();
+}
+function toDurationMs(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value > 1e4 ? Math.round(value) : Math.round(value * 1e3);
+  }
+  if (typeof value !== "string") return void 0;
+  const trimmed = value.trim();
+  if (!trimmed) return void 0;
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric)) return numeric > 1e4 ? Math.round(numeric) : Math.round(numeric * 1e3);
+  const parts = trimmed.split(":").map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return void 0;
+  const seconds = parts.reduce((total, part) => total * 60 + part, 0);
+  return Math.round(seconds * 1e3);
+}
+async function fetchJson3(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": USER_AGENT
+      },
+      signal: controller.signal
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+async function searchOpenverse(query, limit) {
+  const url = `${OPENVERSE_API}?` + new URLSearchParams({
+    q: expandQuery(query),
+    page_size: String(Math.min(Math.max(limit, 1), 50)),
+    mature: "false"
+  });
+  const data = await fetchJson3(url);
+  return (data.results ?? []).filter((item) => isHttpUrl(item.url)).map((item) => {
+    const provider = item.provider || item.source || "audio";
+    const license = item.license ? `CC ${item.license.toUpperCase()}` : void 0;
+    return {
+      id: `openverse:${provider}:${item.id ?? encodeURIComponent(item.url)}`,
+      title: cleanTitle(item.title),
+      previewUrl: item.url,
+      source: `openverse:${provider}`,
+      sourceLabel: `Openverse \xB7 ${provider}`,
+      sourceUrl: item.foreign_landing_url,
+      creator: item.creator,
+      license,
+      fileType: inferFileType(item.url, item.filetype),
+      durationMs: toDurationMs(item.duration)
+    };
+  });
+}
+function archiveSearchQuery(query) {
+  const term = expandQuery(query).replace(/[\\"]/g, " ").trim();
+  if (!term) return "mediatype:audio";
+  return `(title:(${term}) OR description:(${term}) OR subject:(${term})) AND mediatype:audio`;
+}
+function encodeArchivePath(pathname) {
+  return pathname.split("/").map(encodeURIComponent).join("/");
+}
+function pickArchiveAudio(files) {
+  const audioFormats = ["VBR MP3", "MP3", "Ogg Vorbis", "WAVE", "FLAC", "M4A"];
+  return files?.filter((file) => file.name && audioFormats.some((format) => file.format?.toLowerCase().includes(format.toLowerCase()))).sort((a, b) => {
+    const aMp3 = a.name?.toLowerCase().endsWith(".mp3") ? 1 : 0;
+    const bMp3 = b.name?.toLowerCase().endsWith(".mp3") ? 1 : 0;
+    return bMp3 - aMp3;
+  })[0];
+}
+async function searchInternetArchive(query, limit) {
+  const params = new URLSearchParams({
+    q: archiveSearchQuery(query),
+    rows: String(Math.min(Math.max(limit, 1), 8)),
+    output: "json"
+  });
+  for (const field of ["identifier", "title", "creator"]) params.append("fl[]", field);
+  const url = `${ARCHIVE_SEARCH_API}?${params.toString()}`;
+  const data = await fetchJson3(url);
+  const docs = (data.response?.docs ?? []).filter((doc) => doc.identifier);
+  const results = await Promise.all(
+    docs.map(async (doc) => {
+      const identifier = doc.identifier;
+      const metadata = await fetchJson3(`${ARCHIVE_METADATA_API}/${encodeURIComponent(identifier)}`);
+      const file = pickArchiveAudio(metadata.files);
+      if (!file?.name) return null;
+      const previewUrl = `https://archive.org/download/${encodeURIComponent(identifier)}/${encodeArchivePath(file.name)}`;
+      const creator = metadata.metadata?.creator ?? doc.creator;
+      return {
+        id: `archive:${identifier}:${file.name}`,
+        title: cleanTitle(metadata.metadata?.title ?? doc.title ?? file.name),
+        previewUrl,
+        source: "archive",
+        sourceLabel: "Internet Archive",
+        sourceUrl: `https://archive.org/details/${encodeURIComponent(identifier)}`,
+        creator: Array.isArray(creator) ? creator.join(", ") : creator,
+        license: "Archive.org",
+        fileType: inferFileType(previewUrl),
+        durationMs: toDurationMs(file.length)
+      };
+    })
+  );
+  return results.filter((item) => !!item);
+}
 async function searchWikimedia(query, limit) {
   const searchTerm = expandQuery(query);
   const url = "https://commons.wikimedia.org/w/api.php?" + new URLSearchParams({
@@ -3105,25 +3255,27 @@ async function searchWikimedia(query, limit) {
     gsrsearch: `filetype:audio ${searchTerm}`,
     gsrnamespace: "6",
     prop: "imageinfo",
-    iiprop: "url|mime|size",
+    iiprop: "url|mime|size|extmetadata",
     gsrlimit: String(limit),
     format: "json",
     origin: "*"
   });
-  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-  if (!res.ok) return [];
-  const data = await res.json();
+  const data = await fetchJson3(url);
   const results = [];
   for (const page of Object.values(data.query?.pages ?? {})) {
     const info = page.imageinfo?.[0];
     const fileUrl = info?.url;
     if (!fileUrl || !info.mime?.startsWith("audio")) continue;
-    const title = (page.title ?? "Sound").replace(/^File:/, "").replace(/\.[^.]+$/, "");
     results.push({
-      id: `wikimedia:${encodeURIComponent(title)}`,
-      title,
+      id: `wikimedia:${encodeURIComponent(page.title ?? fileUrl)}`,
+      title: cleanTitle(page.title),
       previewUrl: fileUrl,
-      source: "wikimedia"
+      source: "wikimedia",
+      sourceLabel: "Wikimedia Commons",
+      sourceUrl: info.descriptionurl,
+      creator: info.extmetadata?.Artist?.value?.replace(/<[^>]+>/g, ""),
+      license: info.extmetadata?.LicenseShortName?.value?.replace(/<[^>]+>/g, ""),
+      fileType: inferFileType(fileUrl, info.mime.split("/")[1])
     });
   }
   return results;
@@ -3132,13 +3284,18 @@ async function searchSfxOnline(query, limit = 12) {
   const q = query.trim();
   if (!q) throw new Error("\u8BF7\u8F93\u5165\u97F3\u6548\u5173\u952E\u8BCD");
   const curated = CURATED_SFX.filter((item) => scoreSfx(q, item) > 0 || q.length <= 4).sort((a, b) => scoreSfx(q, b) - scoreSfx(q, a));
-  const remote = await searchWikimedia(q, limit).catch(() => []);
-  const merged = [...curated, ...remote];
+  const [openverse, archive, wikimedia] = await Promise.all([
+    searchOpenverse(q, limit).catch(() => []),
+    searchInternetArchive(q, Math.ceil(limit / 2)).catch(() => []),
+    searchWikimedia(q, limit).catch(() => [])
+  ]);
+  const merged = [...openverse, ...archive, ...wikimedia, ...curated];
   const seen = /* @__PURE__ */ new Set();
   const unique = [];
-  for (const item of merged.sort((a, b) => scoreSfx(q, b) - scoreSfx(q, a))) {
-    if (seen.has(item.previewUrl)) continue;
-    seen.add(item.previewUrl);
+  for (const item of merged.sort((a, b) => combinedScore(q, b) - combinedScore(q, a))) {
+    const key = item.previewUrl.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
     unique.push(item);
     if (unique.length >= limit) break;
   }
@@ -4523,6 +4680,14 @@ app.onError((err, c) => {
   console.error("[api error]", err);
   return c.json({ error: err.message || "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF" }, 500);
 });
+function inferAudioExt(url, fileType) {
+  const explicit = fileType?.toLowerCase().replace(/^\./, "");
+  if (explicit && /^[a-z0-9]+$/.test(explicit)) return explicit;
+  const pathname = url.split("?")[0].split("#")[0];
+  const match2 = pathname.match(/\.([a-z0-9]{2,5})$/i);
+  if (match2?.[1]) return match2[1].toLowerCase();
+  return "mp3";
+}
 app.get(
   "/health",
   (c) => c.json({
@@ -4768,12 +4933,12 @@ app.get("/search/sfx", async (c) => {
   }
 });
 app.post("/library/import-sfx", async (c) => {
-  const { title, previewUrl, source } = await c.req.json();
+  const { title, previewUrl, source, fileType, referer } = await c.req.json();
   const tmp = tempDir();
   try {
-    const ext = previewUrl.includes(".wav") ? "wav" : "mp3";
+    const ext = inferAudioExt(previewUrl, fileType);
     const dest = path2.join(tmp, `sfx.${ext}`);
-    await downloadHttp(previewUrl, dest);
+    await downloadHttp(previewUrl, dest, referer);
     return c.json(
       importFile(dest, title, ["foley", "sfx", source], "foley", `sfx:${source}`)
     );

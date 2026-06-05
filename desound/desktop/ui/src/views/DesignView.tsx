@@ -165,7 +165,7 @@ export function DesignView({
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{style.nameZh}</span>
-                      <span className="font-mono text-xs text-ds-green">
+                      <span className="font-mono text-xs text-ds-accent">
                         {(style.similarity * 100).toFixed(0)}%
                       </span>
                     </div>

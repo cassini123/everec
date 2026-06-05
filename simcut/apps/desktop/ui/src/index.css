@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sc-bg: #0e0e10;
+  --color-sc-surface: #18181c;
+  --color-sc-panel: #222228;
+  --color-sc-elevated: #2a2a32;
+  --color-sc-border: #38383f;
+  --color-sc-muted: #8a8a96;
+  --color-sc-text: #ececf0;
+  --color-sc-accent: #5b8def;
+  --color-sc-accent-dim: #3d6fd4;
+  --color-sc-warm: #f59e6c;
+  --color-sc-green: #3dd68c;
+  --color-sc-purple: #a78bfa;
+  --color-sc-track: #141418;
+  --font-sans: "SF Pro Text", "Inter", "PingFang SC", system-ui, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-sc-bg);
+  color: var(--color-sc-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #44444d;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #55555f;
+}
+
+input[type="range"] {
+  accent-color: var(--color-sc-accent);
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.color-swatch {
+  transition: transform 0.15s ease;
+}
+
+.color-swatch:hover {
+  transform: scale(1.08);
+}
+
+.timeline-clip {
+  background: linear-gradient(135deg, var(--color-sc-accent) 0%, var(--color-sc-accent-dim) 100%);
+}
+
+.subtitle-cue {
+  border-left: 3px solid var(--color-sc-accent);
+}

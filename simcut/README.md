@@ -1,18 +1,54 @@
 # Simcut
 
-AI 视频剪辑工作台 — Everec Creative OS 的核心桌面产品。
+轻量剪辑软件 — 对标剪映，但更稳定、渲染更快。专为超短篇创作设计。
 
-> 当前为项目占位目录，实现见 [docs/PRD.md](../docs/PRD.md) §5.3。
+**更清晰的文件管理 · 更简单的色彩设计 · 更快捷的结项**
 
-## 规划能力
+## 功能
 
-- MP4 导入与时间轴编辑
-- 字幕与导出
-- Prompt 可控剪辑（EditPlan JSON）
-- 与 Inspibrary、Project Graph 集成
+- 多语言自动字幕识别（中/英/日/韩）
+- 色彩解析（上传照片 → 波形匹配 LUT）
+- 静帧管理
+- 文字模块（字幕 / 字体 / 文字设计）
+- 简单特效预设
+- AI 解析
+- 导出渲染
 
-## 技术栈（计划）
+## Web 端（浏览器直接用）
 
-- Tauri 2 + React 19 + TypeScript
-- FFmpeg（`media-indexer`）
-- `project-graph`、`timeline-engine` crates
+```bash
+cd simcut/apps/desktop/ui
+npm install
+npm run dev
+```
+
+访问 http://localhost:1421
+
+支持：创建项目、导入视频/图片、预览播放、色彩分析、字幕、静帧、本地存储（localStorage + IndexedDB）
+
+**Vercel 部署**：仓库根目录 `vercel.json` 已指向本目录，推送 `main` 分支即可在线访问。
+
+## 桌面端
+
+```bash
+cd simcut/apps/desktop
+npm install && npm install --prefix ui
+npm run dev
+```
+
+需要 Rust ≥ 1.85 和 FFmpeg。
+
+## 项目结构
+
+```
+simcut/
+├── crates/
+│   ├── timeline-engine/
+│   └── color-engine/
+├── apps/
+│   └── desktop/
+│       ├── src/       # Rust 后端
+│       └── ui/        # React Web / 桌面 UI
+└── docs/
+    └── PRD.md
+```

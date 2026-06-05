@@ -10,10 +10,12 @@
   ],
   "scripts": {
     "dev:web": "npm run dev --workspace=@everec/web-backend & npm run dev --workspace=@everec/web-frontend",
+    "dev:simcut": "npm run dev --prefix simcut/apps/desktop/ui",
     "dev:desktop": "npm run dev --prefix desound/desktop",
     "build:web": "npm run build --workspace=@everec/web-frontend",
+    "build:simcut": "npm run build --prefix simcut/apps/desktop/ui",
     "build:vercel-api": "node api/scripts/build-vercel-api.mjs",
-    "build:vercel": "npm run build:vercel-api && npm run build:web",
+    "build:vercel": "npm run build:simcut",
     "build:desktop": "npm run ui:build --prefix desound/desktop"
   },
   "dependencies": {

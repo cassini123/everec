@@ -1,17 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install",
-  "buildCommand": "npm run build:vercel-api && npm run build:web",
-  "outputDirectory": "desound/web/frontend/dist",
+  "installCommand": "npm install --prefix simcut/apps/desktop/ui",
+  "buildCommand": "npm run build --prefix simcut/apps/desktop/ui",
+  "outputDirectory": "simcut/apps/desktop/ui/dist",
   "framework": "vite",
-  "functions": {
-    "api/**": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

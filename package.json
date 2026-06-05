@@ -12,7 +12,7 @@
     "dev:web": "npm run dev --workspace=@everec/web-backend & npm run dev --workspace=@everec/web-frontend",
     "dev:desktop": "npm run dev --prefix desound/desktop",
     "build:web": "npm run build --workspace=@everec/web-frontend",
-    "build:vercel-api": "node scripts/build-vercel-api.mjs",
+    "build:vercel-api": "node api/scripts/build-vercel-api.mjs",
     "build:vercel": "npm run build:vercel-api && npm run build:web",
     "build:desktop": "npm run ui:build --prefix desound/desktop"
   },

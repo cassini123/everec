@@ -21,8 +21,17 @@ import {
 } from "./parseTitle";
 
 async function fetchJson<T>(url: string, referer?: string): Promise<T> {
-  const headers: Record<string, string> = { "User-Agent": USER_AGENT };
-  if (referer) headers.Referer = referer;
+  const headers: Record<string, string> = {
+    "User-Agent": USER_AGENT,
+    Accept: "application/json, text/plain, */*",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+  };
+  if (referer) {
+    headers.Referer = referer;
+    if (referer.startsWith("https://search.bilibili.com")) {
+      headers.Origin = "https://search.bilibili.com";
+    }
+  }
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(url, { headers });
     if (res.status === 412 && attempt === 0) {
@@ -109,7 +118,7 @@ function mergeResult(base: MusicSearchResult, other: MusicSearchResult): MusicSe
     ...base,
     album: base.album || other.album,
     coverUrl: base.coverUrl || other.coverUrl,
-    previewUrl: base.previewUrl || other.previewUrl,
+    previewUrl: base.previewUrl || (base.source === other.source ? other.previewUrl : undefined),
     durationMs: base.durationMs || other.durationMs,
   };
 }
@@ -177,12 +186,19 @@ async function searchBilibili(
   hint: { title: string; artist: string },
 ): Promise<MusicSearchResult[]> {
   const pageSize = Math.max(limit, 20);
-  const url = `https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(
-    query,
-  )}&page_size=${pageSize}`;
+  const params = new URLSearchParams({
+    search_type: "video",
+    keyword: query,
+    page_size: String(pageSize),
+    page: "1",
+    order: "totalrank",
+    duration: "0",
+    tids: "0",
+  });
+  const url = `https://api.bilibili.com/x/web-interface/search/type?${params.toString()}`;
   const data = await fetchJson<{ data?: { result?: Record<string, unknown>[] } }>(
     url,
-    "https://www.bilibili.com",
+    "https://search.bilibili.com/",
   );
   const results: MusicSearchResult[] = [];
 

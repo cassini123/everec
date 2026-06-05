@@ -68,4 +68,4 @@ for (const app of apps) {
 
 console.log("\n=== Build complete ===");
 console.log(`Portal static: ${portalDist}`);
-console.log("API function: api/index.js (desound + knowgo + prerector)");
+console.log("API function: api/index.js via api/_entry.ts (desound + knowgo + prerector)");

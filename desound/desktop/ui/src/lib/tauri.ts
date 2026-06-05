@@ -21,4 +21,4 @@ export async function invoke<T>(
 }
 
 export const DESKTOP_APP_HINT =
-  "请使用桌面客户端：cd everec/desktop-client && npm install && npm install --prefix ui && npm run dev";
+  "请使用桌面客户端：cd everec/desound/desktop && npm install && npm install --prefix ui && npm run dev";

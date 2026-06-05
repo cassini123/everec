@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@everec/shared": path.resolve(__dirname, "../../shared/src/index.ts"),
+      "@everec/shared": path.resolve(__dirname, "../../../shared/src/index.ts"),
     },
   },
   clearScreen: false,

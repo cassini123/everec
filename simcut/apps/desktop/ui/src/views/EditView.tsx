@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Film, Upload } from "lucide-react";
+import { MediaBin } from "../components/timeline/MediaBin";
 import { Timeline } from "../components/timeline/Timeline";
 import { api } from "../lib/api";
-import type { Project } from "../types";
+import { clipAtTime, findMedia } from "../lib/timelineEdit";
+import type { Clip, Project } from "../types";
 
 interface Props {
   project: Project;
@@ -24,49 +26,59 @@ export function EditView({
   const urlRef = useRef<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewKind, setPreviewKind] = useState<"video" | "image" | null>(null);
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState("");
 
-  const primaryMedia = project.media[project.media.length - 1] ?? project.media[0];
+  const activeClip =
+    (selectedClipId
+      ? project.tracks.flatMap((t) => t.clips).find((c) => c.id === selectedClipId)
+      : null) ?? clipAtTime(project, positionMs);
 
-  useEffect(() => {
-    let cancelled = false;
+  const previewMedia = selectedMediaId
+    ? findMedia(project, selectedMediaId)
+    : activeClip
+      ? findMedia(project, activeClip.mediaId)
+      : project.media[project.media.length - 1];
 
-    async function load() {
-      if (!primaryMedia?.blobId) {
-        if (urlRef.current) {
-          URL.revokeObjectURL(urlRef.current);
-          urlRef.current = null;
-        }
+  const loadPreview = useCallback(async () => {
+    if (!previewMedia) {
+      if (urlRef.current) {
+        URL.revokeObjectURL(urlRef.current);
+        urlRef.current = null;
+      }
+      setPreviewUrl(null);
+      setPreviewKind(null);
+      return;
+    }
+
+    const blobId = previewMedia.blobId ?? previewMedia.id;
+    setLoadError("");
+
+    try {
+      const url = await api.getMediaUrl({ ...previewMedia, blobId });
+      if (!url) {
+        setLoadError("素材未找到，请重新导入");
         setPreviewUrl(null);
-        setPreviewKind(null);
         return;
       }
 
-      setLoadError("");
-      try {
-        const url = await api.getMediaUrl(primaryMedia);
-        if (cancelled || !url) {
-          if (url) URL.revokeObjectURL(url);
-          if (!url) setLoadError("素材未找到，请重新导入");
-          return;
-        }
-
-        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-        urlRef.current = url;
-        setPreviewUrl(url);
-        setPreviewKind(primaryMedia.kind === "image" ? "image" : "video");
-      } catch (err) {
-        if (!cancelled) setLoadError(String(err));
+      if (urlRef.current && urlRef.current !== url) {
+        URL.revokeObjectURL(urlRef.current);
       }
+      urlRef.current = url;
+      setPreviewUrl(url);
+      setPreviewKind(previewMedia.kind === "image" ? "image" : "video");
+    } catch (err) {
+      setLoadError(String(err));
     }
+  }, [previewMedia]);
 
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [primaryMedia?.blobId, primaryMedia?.id, primaryMedia?.kind]);
+  useEffect(() => {
+    loadPreview();
+  }, [loadPreview]);
 
   useEffect(() => {
     return () => {
@@ -81,7 +93,7 @@ export function EditView({
     const video = videoRef.current;
     if (!video || previewKind !== "video") return;
     if (playing) {
-      video.play().catch(() => setLoadError("播放失败，请检查视频编码格式"));
+      video.play().catch(() => setLoadError("播放失败，请检查视频编码（推荐 H.264 MP4）"));
     } else {
       video.pause();
     }
@@ -90,15 +102,23 @@ export function EditView({
   useEffect(() => {
     const video = videoRef.current;
     if (!video || previewKind !== "video" || playing) return;
-    if (Math.abs(video.currentTime * 1000 - positionMs) > 200) {
-      video.currentTime = positionMs / 1000;
+    const target = activeClip
+      ? (activeClip.trimInMs + (positionMs - activeClip.startMs)) / 1000
+      : positionMs / 1000;
+    if (Number.isFinite(target) && Math.abs(video.currentTime - target) > 0.15) {
+      video.currentTime = Math.max(0, target);
     }
-  }, [positionMs, playing, previewKind]);
+  }, [positionMs, playing, previewKind, activeClip]);
 
   const handleTimeUpdate = () => {
     const video = videoRef.current;
-    if (!video) return;
-    onPositionChange(Math.round(video.currentTime * 1000));
+    if (!video || !activeClip) {
+      onPositionChange(Math.round((video?.currentTime ?? 0) * 1000));
+      return;
+    }
+    onPositionChange(
+      Math.round(activeClip.startMs + video.currentTime * 1000 - activeClip.trimInMs),
+    );
   };
 
   const handleImport = async (files: FileList | null) => {
@@ -107,8 +127,12 @@ export function EditView({
     setMessage("");
     setLoadError("");
     try {
-      const { project: updated } = await api.importMediaFile(project, files[0]);
+      const { project: updated, asset } = await api.importMediaFile(project, files[0]);
       onProjectUpdate(updated);
+      setSelectedMediaId(asset.id);
+      const clips0 = updated.tracks[0]?.clips ?? [];
+      const lastClip = clips0[clips0.length - 1];
+      if (lastClip) setSelectedClipId(lastClip.id);
       setMessage(`已导入: ${files[0].name}`);
     } catch (err) {
       setLoadError(String(err));
@@ -118,13 +142,32 @@ export function EditView({
     }
   };
 
+  const handleUpdateClip = async (clipId: string, patch: Partial<Clip>) => {
+    const updated = await api.updateClip(project, clipId, patch);
+    onProjectUpdate(updated);
+  };
+
+  const handleDropMedia = async (mediaId: string, trackIndex: number, startMs: number) => {
+    const updated = await api.addClipToTrack(project, mediaId, trackIndex, startMs);
+    onProjectUpdate(updated);
+    setSelectedMediaId(mediaId);
+  };
+
+  const handleRemoveClip = async (clipId: string) => {
+    const updated = await api.removeClip(project, clipId);
+    onProjectUpdate(updated);
+    setSelectedClipId(null);
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="relative flex h-64 shrink-0 flex-col border-b border-sc-border bg-black">
+      <div className="relative flex h-56 shrink-0 flex-col border-b border-sc-border bg-black">
         <div className="flex items-center justify-between px-3 py-2">
           <span className="text-xs text-sc-muted">
             预览
-            {primaryMedia ? ` · ${primaryMedia.name} (${primaryMedia.kind ?? "video"})` : ""}
+            {previewMedia
+              ? ` · ${previewMedia.name} (${previewMedia.kind ?? "video"})`
+              : ""}
           </span>
           <div className="flex items-center gap-2">
             <input
@@ -150,29 +193,33 @@ export function EditView({
           {previewUrl && previewKind === "video" ? (
             <video
               ref={videoRef}
-              key={previewUrl}
               src={previewUrl}
               className="max-h-full max-w-full object-contain"
               playsInline
               muted
               preload="auto"
               onTimeUpdate={handleTimeUpdate}
-              onLoadedData={() => setLoadError("")}
+              onCanPlay={() => setLoadError("")}
+              onLoadedMetadata={() => {
+                const v = videoRef.current;
+                if (v && !playing) v.currentTime = positionMs / 1000;
+              }}
               onError={() =>
-                setLoadError("视频解码失败。iPhone 拍摄的 HEVC 视频请先转为 H.264 MP4")
+                setLoadError("视频解码失败。请将素材转为 H.264 MP4（ffmpeg -i in.mov -c:v libx264 out.mp4）")
               }
-              onEnded={() => onPositionChange(0)}
+              onEnded={() => onPositionChange(activeClip?.startMs ?? 0)}
             />
           ) : previewUrl && previewKind === "image" ? (
             <img
               src={previewUrl}
-              alt={primaryMedia?.name ?? "素材"}
+              alt={previewMedia?.name ?? "素材"}
               className="max-h-full max-w-full object-contain"
+              onError={() => setLoadError("图片加载失败")}
             />
           ) : (
             <div className="text-center text-sc-muted">
               <Film size={40} className="mx-auto opacity-20" />
-              <p className="mt-2 text-xs">导入视频或图片开始剪辑（30s – 30min）</p>
+              <p className="mt-2 text-xs">导入视频或图片，或从素材库拖到时间轴</p>
             </div>
           )}
         </div>
@@ -187,7 +234,23 @@ export function EditView({
           </div>
         )}
       </div>
-      <Timeline project={project} positionMs={positionMs} />
+
+      <MediaBin
+        media={project.media}
+        selectedMediaId={selectedMediaId}
+        onSelect={setSelectedMediaId}
+      />
+
+      <Timeline
+        project={project}
+        positionMs={positionMs}
+        selectedClipId={selectedClipId}
+        onSelectClip={setSelectedClipId}
+        onSeek={onPositionChange}
+        onUpdateClip={handleUpdateClip}
+        onDropMedia={handleDropMedia}
+        onRemoveClip={handleRemoveClip}
+      />
     </div>
   );
 }

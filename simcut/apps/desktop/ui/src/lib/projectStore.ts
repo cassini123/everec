@@ -1,3 +1,4 @@
+import { migrateProject } from "./timelineEdit";
 import type { Clip, Project, ProjectSummary, SubtitleCue, StillFrame } from "../types";
 
 const MANIFEST_KEY = "simcut-projects";
@@ -68,7 +69,7 @@ export function createProject(name: string): Project {
 export function loadProject(id: string): Project {
   const raw = localStorage.getItem(projectKey(id));
   if (!raw) throw new Error("项目不存在");
-  return JSON.parse(raw) as Project;
+  return migrateProject(JSON.parse(raw) as Project);
 }
 
 export function saveProject(project: Project) {

@@ -1,4 +1,5 @@
 import { guessMime, isImageFile, isVideoFile } from "./mime";
+import { cachePreviewUrl, getCachedUrl, setCachedUrl } from "./previewCache";
 
 const DB_NAME = "simcut-media";
 const STORE = "blobs";
@@ -26,7 +27,8 @@ function openDb(): Promise<IDBDatabase> {
 export async function saveBlob(id: string, file: File | Blob, fileName?: string): Promise<void> {
   const mimeType =
     file.type || guessMime(fileName ?? (file instanceof File ? file.name : "media.mp4"));
-  const buffer = await file.arrayBuffer();
+  const buffer = (await file.arrayBuffer()).slice(0);
+  cachePreviewUrl(id, new Blob([buffer], { type: mimeType }));
   const entry: StoredMedia = { mimeType, buffer };
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -68,8 +70,17 @@ export async function getBlob(id: string): Promise<Blob | null> {
 }
 
 export async function getObjectUrl(id: string): Promise<string | null> {
+  const cached = getCachedUrl(id);
+  if (cached) return cached;
   const blob = await getBlob(id);
-  return blob ? URL.createObjectURL(blob) : null;
+  if (!blob) return null;
+  const url = URL.createObjectURL(blob);
+  setCachedUrl(id, url);
+  return url;
+}
+
+export function getObjectUrlSync(id: string): string | null {
+  return getCachedUrl(id);
 }
 
 export function probeVideo(file: File, blobUrl?: string): Promise<{

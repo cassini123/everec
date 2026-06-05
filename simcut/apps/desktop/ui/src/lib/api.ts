@@ -12,7 +12,9 @@ import type {
 } from "../types";
 import { analyzeImageFile, analyzeWaveformMatch } from "./colorAnalysis";
 import { guessMime, guessKind } from "./mime";
+import { cachePreviewUrl } from "./previewCache";
 import * as mediaStore from "./mediaStore";
+import { addClipToTrack, migrateProject, removeClip, updateClip } from "./timelineEdit";
 import * as projectStore from "./projectStore";
 import { DESKTOP_APP_HINT, invoke, isTauriApp } from "./tauri";
 
@@ -72,7 +74,7 @@ export const api = {
 
   loadProject: (id: string): Promise<Project> =>
     isTauriApp()
-      ? invoke("load_project", { id })
+      ? invoke("load_project", { id }).then((p) => migrateProject(p as Project))
       : Promise.resolve(projectStore.loadProject(id)),
 
   saveProject: (project: Project): Promise<void> =>
@@ -92,6 +94,7 @@ export const api = {
     const id = crypto.randomUUID();
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "mp4";
     const mimeType = file.type || guessMime(file.name);
+    cachePreviewUrl(id, file);
     await mediaStore.saveBlob(id, file, file.name);
 
     const meta = await mediaStore.probeMedia(file);
@@ -134,9 +137,28 @@ export const api = {
   },
 
   getMediaUrl: (asset: MediaAsset): Promise<string | null> => {
-    if (!asset.blobId) return Promise.resolve(null);
-    return mediaStore.getObjectUrl(asset.blobId);
+    const blobId = asset.blobId ?? asset.id;
+    const sync = mediaStore.getObjectUrlSync(blobId);
+    if (sync) return Promise.resolve(sync);
+    return mediaStore.getObjectUrl(blobId);
   },
+
+  updateClip: (project: Project, clipId: string, patch: Parameters<typeof updateClip>[2]) =>
+    Promise.resolve(updateClip(project, clipId, patch)),
+
+  addClipToTrack: (
+    project: Project,
+    mediaId: string,
+    trackIndex: number,
+    startMs: number,
+  ): Promise<Project> => {
+    const media = project.media.find((m) => m.id === mediaId);
+    if (!media) return Promise.reject(new Error("素材不存在"));
+    return Promise.resolve(addClipToTrack(project, media, trackIndex, startMs));
+  },
+
+  removeClip: (project: Project, clipId: string): Promise<Project> =>
+    Promise.resolve(removeClip(project, clipId)),
 
   importMedia: (
     projectId: string,

@@ -2,6 +2,7 @@ import {
   BookOpen,
   Camera,
   FileText,
+  GitBranch,
   Globe,
   Palette,
   Sparkles,
@@ -49,6 +50,13 @@ const items: {
     sub: "风格体系",
     icon: Palette,
     color: "text-kg-accent",
+  },
+  {
+    id: "graph",
+    label: "Graph",
+    sub: "知识图谱",
+    icon: GitBranch,
+    color: "text-kg-blue",
   },
 ];
 

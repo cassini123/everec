@@ -6,6 +6,7 @@ import { CaptureView } from "./views/CaptureView";
 import { AnalyzeView } from "./views/AnalyzeView";
 import { DocumentView } from "./views/DocumentView";
 import { StyleView } from "./views/StyleView";
+import { GraphView } from "./views/GraphView";
 import { api, getStoredApiKey, setStoredApiKey } from "./lib/api";
 import type { KnowgoProject, KnowgoWorkspace } from "./types";
 
@@ -99,6 +100,7 @@ export default function App() {
           {workspace === "style" && (
             <StyleView project={project} onUpdate={setProject} />
           )}
+          {workspace === "graph" && <GraphView project={project} />}
         </main>
       </div>
 

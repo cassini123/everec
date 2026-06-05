@@ -13,4 +13,15 @@ export type {
   FontRecommendation,
   VfxRecommendation,
   SimilarShort,
+  GraphNodeType,
+  GraphEdgeType,
+  GraphNode,
+  GraphEdge,
+  ProjectGraph,
+  GraphLayoutNode,
+  GraphQueryResult,
 } from "@everec/shared";
+
+export { GRAPH_NODE_COLORS, GRAPH_EDGE_LABELS } from "@everec/shared";
+
+export type { GraphResponse } from "./graphTypes";

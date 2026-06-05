@@ -13,6 +13,16 @@
 | **Analyze** | 图片解析（艺术风格、实现方法）；视频解析（短片风格、自动镜头切分、分镜表） |
 | **Document** | 可编辑灵感文档，支持嵌入图片/视频 |
 | **Style** | 整体风格关键词、字体推荐（预览）、海报风格、特效实现参考、相似短片推荐 |
+| **Graph** | Project Graph 知识图谱可视化、节点详情、导出 JSON |
+
+## Project Graph
+
+Knowgo 将 Brief、素材、分析、分镜、风格决策写入 **Project Graph**（项目知识图谱）：
+
+- 节点：Project、Brief、Asset、Analysis、Shot、StyleTag、Font、ReferenceFilm 等
+- 边：derived_from、evidences、similar_to、implements、constrains 等
+- 存储：`data/knowgo/graphs/{projectId}.json`（Phase 1，后续迁移 SQLite）
+- API：`GET /api/knowgo/projects/:id/graph`
 
 ## 目录结构
 

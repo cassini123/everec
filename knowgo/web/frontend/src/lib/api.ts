@@ -1,4 +1,6 @@
 import type {
+  GraphNodeType,
+  GraphResponse,
   ImageAnalysis,
   InspirationCapture,
   KnowgoProject,
@@ -7,6 +9,7 @@ import type {
   UrlParseResult,
   VideoAnalysis,
   InspirationDocument,
+  ProjectGraph,
 } from "../types";
 
 const BASE = "/api/knowgo";
@@ -62,8 +65,15 @@ export const api = {
     });
   },
 
-  analyzeImage: (captureId: string, fileName: string, hint: string, apiKey?: string) => {
+  analyzeImage: (
+    projectId: string,
+    captureId: string,
+    fileName: string,
+    hint: string,
+    apiKey?: string,
+  ) => {
     const fd = new FormData();
+    fd.append("projectId", projectId);
     fd.append("captureId", captureId);
     fd.append("fileName", fileName);
     fd.append("hint", hint);
@@ -72,6 +82,7 @@ export const api = {
   },
 
   analyzeVideo: (
+    projectId: string,
     captureId: string,
     durationSec: number,
     hint: string,
@@ -80,15 +91,31 @@ export const api = {
     json<VideoAnalysis>(`${BASE}/analyze/video`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ captureId, durationSec, hint, apiKey }),
+      body: JSON.stringify({ projectId, captureId, durationSec, hint, apiKey }),
     }),
 
-  analyzeStyle: (hint: string, keywords: string[]) =>
+  analyzeStyle: (projectId: string, hint: string, keywords: string[]) =>
     json<StyleGuide>(`${BASE}/analyze/style`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hint, keywords }),
+      body: JSON.stringify({ projectId, hint, keywords }),
     }),
+
+  getGraph: (projectId: string) =>
+    json<GraphResponse>(`${BASE}/projects/${projectId}/graph`),
+
+  rebuildGraph: (projectId: string) =>
+    json<GraphResponse>(`${BASE}/projects/${projectId}/graph/rebuild`, {
+      method: "POST",
+    }),
+
+  exportGraph: (projectId: string) =>
+    `${BASE}/projects/${projectId}/graph/export`,
+
+  queryGraph: (projectId: string, type?: GraphNodeType) => {
+    const q = type ? `?type=${encodeURIComponent(type)}` : "";
+    return json<ProjectGraph>(`${BASE}/projects/${projectId}/graph/query${q}`);
+  },
 };
 
 export function getStoredApiKey(): string {

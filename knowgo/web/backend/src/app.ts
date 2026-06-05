@@ -2,8 +2,17 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import fs from "node:fs";
 import path from "node:path";
-import { parseWebUrl, analyzeImageLocal } from "@everec/shared";
+import { parseWebUrl, analyzeImageLocal, computeGraphLayout } from "@everec/shared";
 import { analyzeImage, analyzeVideo, buildStyleGuide } from "./analyze";
+import {
+  exportGraphJson,
+  graphRebuildFromProject,
+  graphSyncImageAnalysis,
+  graphSyncVideoAnalysis,
+  graphSyncStyleGuide,
+  loadGraph,
+  queryGraph,
+} from "./graphStore";
 import {
   addCapture,
   createProject,
@@ -52,6 +61,37 @@ app.delete("/projects/:id", (c) => {
   const ok = deleteProject(c.req.param("id"));
   if (!ok) return c.json({ error: "not found" }, 404);
   return c.json({ ok: true });
+});
+
+app.get("/projects/:id/graph", (c) => {
+  const project = getProject(c.req.param("id"));
+  if (!project) return c.json({ error: "not found" }, 404);
+  const graph = loadGraph(c.req.param("id"));
+  const layout = computeGraphLayout(graph);
+  return c.json({ graph, layout });
+});
+
+app.get("/projects/:id/graph/query", (c) => {
+  const project = getProject(c.req.param("id"));
+  if (!project) return c.json({ error: "not found" }, 404);
+  const type = c.req.query("type") as import("@everec/shared").GraphNodeType | undefined;
+  const refId = c.req.query("refId");
+  return c.json(queryGraph(c.req.param("id"), { type, refId }));
+});
+
+app.post("/projects/:id/graph/rebuild", (c) => {
+  const project = getProject(c.req.param("id"));
+  if (!project) return c.json({ error: "not found" }, 404);
+  const graph = graphRebuildFromProject(project);
+  return c.json({ graph, layout: computeGraphLayout(graph) });
+});
+
+app.get("/projects/:id/graph/export", (c) => {
+  const project = getProject(c.req.param("id"));
+  if (!project) return c.json({ error: "not found" }, 404);
+  c.header("Content-Type", "application/json");
+  c.header("Content-Disposition", `attachment; filename="knowgo-graph-${project.id}.json"`);
+  return c.body(exportGraphJson(project.id));
 });
 
 app.post("/parse-url", async (c) => {
@@ -124,11 +164,14 @@ app.get("/media/:fileName", (c) => {
 app.post("/analyze/image", async (c) => {
   const body = await c.req.parseBody();
   const captureId = String(body.captureId ?? "");
+  const projectId = String(body.projectId ?? "");
   const hint = String(body.hint ?? "");
   const apiKey = body.apiKey ? String(body.apiKey) : undefined;
   const file = body.file;
 
   if (!captureId) return c.json({ error: "缺少 captureId" }, 400);
+
+  let result;
 
   if (file && typeof file !== "string") {
     const f = file as File;
@@ -142,28 +185,32 @@ app.post("/analyze/image", async (c) => {
           : ext === "gif"
             ? "image/gif"
             : "image/jpeg";
-    const result = await analyzeImage(captureId, buffer, mime, hint, apiKey);
-    return c.json(result);
+    result = await analyzeImage(captureId, buffer, mime, hint, apiKey);
+  } else {
+    const fileName = String(body.fileName ?? "");
+    if (fileName) {
+      const fp = getMediaPath(fileName);
+      if (!fp) return c.json({ error: "文件不存在" }, 400);
+      const ext = path.extname(fp).slice(1).toLowerCase();
+      const mime =
+        ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+      const buffer = fs.readFileSync(fp);
+      result = await analyzeImage(captureId, buffer, mime, hint, apiKey);
+    } else {
+      result = analyzeImageLocal(captureId, hint);
+    }
   }
 
-  const fileName = String(body.fileName ?? "");
-  if (fileName) {
-    const fp = getMediaPath(fileName);
-    if (!fp) return c.json({ error: "文件不存在" }, 400);
-    const ext = path.extname(fp).slice(1).toLowerCase();
-    const mime =
-      ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
-    const buffer = fs.readFileSync(fp);
-    const result = await analyzeImage(captureId, buffer, mime, hint, apiKey);
-    return c.json(result);
+  if (projectId) {
+    graphSyncImageAnalysis(projectId, captureId, result);
   }
-
-  return c.json(analyzeImageLocal(captureId, hint));
+  return c.json(result);
 });
 
 app.post("/analyze/video", async (c) => {
-  const { captureId, durationSec, hint, apiKey } = await c.req.json<{
+  const { captureId, projectId, durationSec, hint, apiKey } = await c.req.json<{
     captureId: string;
+    projectId?: string;
     durationSec?: number;
     hint?: string;
     apiKey?: string;
@@ -175,15 +222,23 @@ app.post("/analyze/video", async (c) => {
     hint ?? "",
     apiKey,
   );
+  if (projectId) {
+    graphSyncVideoAnalysis(projectId, captureId, result);
+  }
   return c.json(result);
 });
 
 app.post("/analyze/style", async (c) => {
-  const { hint, keywords } = await c.req.json<{
+  const { hint, keywords, projectId } = await c.req.json<{
     hint?: string;
     keywords?: string[];
+    projectId?: string;
   }>();
-  return c.json(buildStyleGuide(hint ?? "", keywords ?? []));
+  const guide = buildStyleGuide(hint ?? "", keywords ?? []);
+  if (projectId) {
+    graphSyncStyleGuide(projectId, guide);
+  }
+  return c.json(guide);
 });
 
 export default app;

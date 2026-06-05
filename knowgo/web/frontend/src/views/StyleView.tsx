@@ -27,7 +27,7 @@ export function StyleView({ project, onUpdate }: StyleViewProps) {
     try {
       const hint = `${project.brief.tone} ${project.brief.references} ${project.captures.map((c) => c.title).join(" ")}`;
       const keywords = project.captures.flatMap((c) => [c.title, c.platform ?? ""]).filter(Boolean);
-      const guide = await api.analyzeStyle(hint, keywords);
+      const guide = await api.analyzeStyle(project.id, hint, keywords);
       const updated = await saveStyleGuide(project.id, guide);
       onUpdate(updated);
     } finally {

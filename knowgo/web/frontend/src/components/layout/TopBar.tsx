@@ -7,6 +7,7 @@ const labels: Record<KnowgoWorkspace, string> = {
   analyze: "灵感分析",
   document: "输出文档",
   style: "风格体系",
+  graph: "Project Graph",
 };
 
 interface TopBarProps {

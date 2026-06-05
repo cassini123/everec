@@ -6,3 +6,5 @@ export * from "./library/parseTitle";
 export * from "./knowgo/types";
 export * from "./knowgo/urlParse";
 export * from "./knowgo/analyzeLocal";
+export * from "./knowgo/graph";
+export * from "./knowgo/graphSync";

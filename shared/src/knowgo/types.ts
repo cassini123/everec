@@ -3,7 +3,8 @@ export type KnowgoWorkspace =
   | "capture"
   | "analyze"
   | "document"
-  | "style";
+  | "style"
+  | "graph";
 
 export interface KnowgoProject {
   id: string;

@@ -44,35 +44,38 @@ export function AnalyzeView({ project, apiKey, onUpdate }: AnalyzeViewProps) {
 
       if (selected.type === "image" && selected.fileName) {
         const result = await api.analyzeImage(
+          project.id,
           selected.id,
           selected.fileName,
           hint,
           apiKey || undefined,
         );
         setImageResult(result);
-        const style = await api.analyzeStyle(hint, result.techniques);
+        const style = await api.analyzeStyle(project.id, hint, result.techniques);
         const updated = await saveStyleGuide(project.id, style);
         onUpdate(updated);
       } else if (selected.type === "video") {
         const result = await api.analyzeVideo(
+          project.id,
           selected.id,
           durationSec,
           hint,
           apiKey || undefined,
         );
         setVideoResult(result);
-        const style = await api.analyzeStyle(hint, result.overallKeywords);
+        const style = await api.analyzeStyle(project.id, hint, result.overallKeywords);
         const updated = await saveStyleGuide(project.id, style);
         onUpdate(updated);
       } else if (selected.type === "url" || selected.previewUrl) {
         const result = await api.analyzeImage(
+          project.id,
           selected.id,
           selected.fileName ?? "",
           hint,
           apiKey || undefined,
         );
         setImageResult(result);
-        const style = await api.analyzeStyle(hint, [result.artStyle, result.mood]);
+        const style = await api.analyzeStyle(project.id, hint, [result.artStyle, result.mood]);
         const updated = await saveStyleGuide(project.id, style);
         onUpdate(updated);
       } else {

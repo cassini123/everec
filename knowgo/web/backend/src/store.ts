@@ -8,6 +8,13 @@ import {
   type InspirationCapture,
   type KnowgoProject,
 } from "@everec/shared";
+import {
+  deleteGraph,
+  graphSyncBrief,
+  graphSyncCapture,
+  graphSyncStyleGuide,
+  initGraphForProject,
+} from "./graphStore";
 
 const DATA_DIR = process.env.VERCEL
   ? path.join("/tmp", "everec-knowgo")
@@ -58,6 +65,7 @@ export function createProject(title = "未命名项目"): KnowgoProject {
   const projects = readProjects();
   projects.push(project);
   writeProjects(projects);
+  initGraphForProject(project.id, title);
   return project;
 }
 
@@ -74,7 +82,10 @@ export function updateProject(
     updatedAt: new Date().toISOString(),
   };
   writeProjects(projects);
-  return projects[idx];
+  const updated = projects[idx];
+  if (patch.brief) graphSyncBrief(id, updated.brief);
+  if (patch.styleGuide) graphSyncStyleGuide(id, updated.styleGuide);
+  return updated;
 }
 
 export function deleteProject(id: string): boolean {
@@ -82,6 +93,7 @@ export function deleteProject(id: string): boolean {
   const next = projects.filter((p) => p.id !== id);
   if (next.length === projects.length) return false;
   writeProjects(next);
+  deleteGraph(id);
   return true;
 }
 
@@ -98,6 +110,7 @@ export function addCapture(
   };
   project.captures.unshift(item);
   updateProject(projectId, { captures: project.captures });
+  graphSyncCapture(projectId, item);
   return item;
 }
 

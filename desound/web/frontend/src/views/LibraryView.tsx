@@ -393,7 +393,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
               </button>
             </div>
             <p className="px-4 pb-2 text-[11px] text-ds-muted">
-              搜索互联网音源（自动解析）与 iTunes，每首歌仅展示一条结果
+              iTunes 曲库搜索，每首歌仅展示一条结果
             </p>
 
             <div className="flex-1 overflow-auto p-4">

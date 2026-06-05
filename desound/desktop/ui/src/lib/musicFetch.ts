@@ -120,17 +120,8 @@ export async function saveSearchResultToLibrary(result: MusicSearchResult): Prom
     const resolved = await resolveMusicAudioUrl(result);
     return importViaHttp(resolved.url, displayName, tags, sourceLabel, resolved.referer);
   } catch (err) {
-    if (result.source === "itunes" && result.previewUrl) {
+    if (result.previewUrl) {
       return importViaHttp(result.previewUrl, displayName, tags, sourceLabel);
-    }
-    const bvid = result.playBvid ?? result.id.replace(/^internet:/, "");
-    if (bvid) {
-      return invoke<SoundAsset>("download_media_with_ytdlp", {
-        url: `https://www.bilibili.com/video/${bvid}`,
-        name: displayName,
-        tags,
-        sourceLabel,
-      });
     }
     throw err;
   }

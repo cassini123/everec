@@ -2164,9 +2164,6 @@ import path2 from "node:path";
 var USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 // shared/src/library/parseTitle.ts
-function decodeHtmlEntities(text) {
-  return text.replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16))).replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec))).replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-}
 function splitQuery(query) {
   const q = query.trim();
   if (!q) return { title: "", artist: "" };
@@ -2182,54 +2179,12 @@ function splitQuery(query) {
   if (enLast) return { artist: enLast[2].trim(), title: enLast[1].trim() };
   return { title: q, artist: "" };
 }
-function cleanRawTitle(raw2) {
-  return decodeHtmlEntities(raw2).replace(/<[^>]+>/g, "").replace(/【[^】]*】/g, "").replace(/\[[^\]]*\]/g, "").replace(/^[^|｜]*[|｜]\s*/, "").replace(/\s+/g, " ").trim();
-}
 function cleanSongTitle(title) {
   return title.replace(/^[\s《》「」"']+|[\s《》「」"']+$/g, "").replace(/^\d{4,}\s*/, "").replace(/\s*[\-—–|·]\s*[\u4e00-\u9fff]{6,}.*$/, "").replace(/\s*\([^)]*$/, "").replace(/\s*（[^）]*$/, "").replace(/\s*(live|Live|LIVE|现场|版|cover|Cover).*$/, "").trim();
 }
 function cleanArtist(artist) {
   const a = artist.replace(/^[\s《》「」"'@]+|[\s《》「」"'@]+$/g, "").split(/[,、/|]/)[0].trim();
   return a || "\u672A\u77E5\u6B4C\u624B";
-}
-function parseSongFromText(raw2, queryHint) {
-  const cleaned = cleanRawTitle(raw2);
-  const book = cleaned.match(/《([^》]+)》/);
-  if (book) {
-    const title = cleanSongTitle(book[1]);
-    const tail = cleaned.replace(book[0], "").replace(/^[\s\-—–·|：:]+/, "");
-    const artist = tail ? cleanArtist(tail.split(/[\-—–|·]/)[0]) : queryHint?.artist || "\u672A\u77E5\u6B4C\u624B";
-    return { title, artist: artist || queryHint?.artist || "\u672A\u77E5\u6B4C\u624B" };
-  }
-  const dash = cleaned.match(/^(.+?)\s*[\-—–]\s*(.+)$/);
-  if (dash) {
-    const left = dash[1].trim();
-    const right = dash[2].trim();
-    if (/^\d{6,8}\s/.test(left) && queryHint?.title) {
-      return { title: cleanSongTitle(queryHint.title), artist: cleanArtist(right) };
-    }
-    if (queryHint?.artist && (left.includes(queryHint.artist) || right.includes(queryHint.artist))) {
-      return {
-        title: cleanSongTitle(queryHint.title || left.replace(/^\d{4,}\s*/, "")),
-        artist: cleanArtist(queryHint.artist)
-      };
-    }
-    if (queryHint?.title && (left.toLowerCase().includes(queryHint.title.toLowerCase()) || right.toLowerCase().includes(queryHint.title.toLowerCase()))) {
-      return {
-        title: cleanSongTitle(queryHint.title),
-        artist: queryHint.artist ? cleanArtist(queryHint.artist) : cleanArtist(right)
-      };
-    }
-    return { title: cleanSongTitle(left), artist: cleanArtist(right) };
-  }
-  if (queryHint?.title && cleaned.toLowerCase().includes(queryHint.title.toLowerCase())) {
-    const artistPart = queryHint.artist ? cleanArtist(queryHint.artist) : "\u672A\u77E5\u6B4C\u624B";
-    return {
-      title: cleanSongTitle(queryHint.title),
-      artist: artistPart
-    };
-  }
-  return { title: cleanSongTitle(cleaned), artist: queryHint?.artist ? cleanArtist(queryHint.artist) : "\u672A\u77E5\u6B4C\u624B" };
 }
 function normalizeSongTitle(title) {
   return cleanSongTitle(title).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, "").trim();
@@ -2245,80 +2200,8 @@ function isRemixOrLive(title) {
   return /\bdj\b/i.test(title) || /remix/i.test(title) || /\(.*版.*\)/.test(title) || /（.*版.*）/.test(title) || /\blive\b/i.test(title) || /现场/.test(title) || /cover/i.test(title);
 }
 
-// shared/src/library/resolve.ts
-var BILI_REFERER = "https://www.bilibili.com";
-async function fetchJson(url, referer) {
-  const headers = { "User-Agent": USER_AGENT };
-  if (referer) headers.Referer = referer;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch(url, { headers });
-    if (res.status === 412 && attempt === 0) {
-      await new Promise((r) => setTimeout(r, 400));
-      continue;
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  }
-  throw new Error("HTTP 412");
-}
-async function getBilibiliAudioUrl(bvid) {
-  const info = await fetchJson(
-    `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
-    BILI_REFERER
-  );
-  if (info.code !== 0 || !info.data?.cid) return null;
-  const play = await fetchJson(
-    `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${info.data.cid}&fnval=16&qn=0`,
-    BILI_REFERER
-  );
-  const audio = play.data?.dash?.audio?.[0];
-  return audio?.baseUrl ?? audio?.base_url ?? null;
-}
-async function findBilibiliAudioByQuery(title, artist) {
-  const queries = [`${artist} ${title}`.trim(), title.trim()].filter(Boolean);
-  const seen = /* @__PURE__ */ new Set();
-  for (const keyword of queries) {
-    const url = `https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(keyword)}&page=1`;
-    const data = await fetchJson(
-      url,
-      "https://search.bilibili.com"
-    );
-    for (const item of data.data?.result ?? []) {
-      const bvid = String(item.bvid ?? "");
-      if (!bvid || seen.has(bvid)) continue;
-      seen.add(bvid);
-      const rawTitle = String(item.title ?? "").replace(/<[^>]+>/g, "");
-      const titleLower = title.toLowerCase();
-      if (!rawTitle.toLowerCase().includes(titleLower.replace(/\s/g, ""))) continue;
-      const audioUrl = await getBilibiliAudioUrl(bvid);
-      if (!audioUrl) continue;
-      const pic = item.pic ? String(item.pic) : void 0;
-      return {
-        bvid,
-        audioUrl,
-        coverUrl: pic?.startsWith("//") ? `https:${pic}` : pic
-      };
-    }
-  }
-  return null;
-}
-async function resolveMusicAudioUrl(result) {
-  if (result.source === "itunes" && result.previewUrl) {
-    return { url: result.previewUrl, ext: result.previewUrl.includes(".m4a") ? "m4a" : "mp3" };
-  }
-  const bvid = result.playBvid ?? (result.id.startsWith("internet:") ? result.id.replace("internet:", "") : null) ?? (result.id.startsWith("bilibili:") ? result.id.replace("bilibili:", "") : null);
-  if (bvid) {
-    const audioUrl = result.previewUrl ?? await getBilibiliAudioUrl(bvid);
-    if (audioUrl) return { url: audioUrl, referer: BILI_REFERER, ext: "m4a" };
-  }
-  const bili = await findBilibiliAudioByQuery(result.title, result.artist);
-  if (bili) return { url: bili.audioUrl, referer: BILI_REFERER, ext: "m4a" };
-  throw new Error("\u6682\u65F6\u65E0\u6CD5\u89E3\u6790\u8BE5\u6B4C\u66F2\uFF0C\u8BF7\u6362\u4E00\u6761\u7ED3\u679C\u6216\u4E0A\u4F20\u672C\u5730\u6587\u4EF6");
-}
-
 // shared/src/library/search.ts
-var BILI_SEARCH = "https://search.bilibili.com";
-async function fetchJson2(url, referer) {
+async function fetchJson(url, referer) {
   const headers = { "User-Agent": USER_AGENT };
   if (referer) headers.Referer = referer;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -2342,9 +2225,8 @@ function scoreCandidate(query, item) {
   else if (qt && title.includes(qt)) score += 80;
   if (qa && artist.includes(qa)) score += 100;
   if (item.album) score += 40;
-  if (item.previewUrl || item.playBvid) score += 30;
-  if (item.source === "internet" && item.previewUrl) score += 25;
-  if (item.source === "itunes" && item.album && !/live|现场/i.test(item.album)) score += 20;
+  if (item.previewUrl) score += 30;
+  if (item.album && !/live|现场/i.test(item.album)) score += 20;
   if (isRemixOrLive(item.title) && !/live|版|dj|remix/i.test(query.title + query.artist)) score -= 80;
   if (item.album && /live|现场/i.test(item.album) && !/live|现场/i.test(query.title + query.artist)) {
     score -= 70;
@@ -2373,54 +2255,13 @@ function mergeResult(base, other) {
     album: base.album || other.album,
     coverUrl: base.coverUrl || other.coverUrl,
     previewUrl: base.previewUrl || other.previewUrl,
-    playBvid: base.playBvid || other.playBvid,
     durationMs: base.durationMs || other.durationMs
   };
-}
-async function searchInternet(query, limit) {
-  const hint = splitQuery(query);
-  const keywords = [query.trim(), hint.title, `${hint.artist} ${hint.title}`.trim()].filter(
-    (v, i, a) => v && a.indexOf(v) === i
-  );
-  const results = [];
-  const seenBvid = /* @__PURE__ */ new Set();
-  for (const keyword of keywords) {
-    if (!keyword) continue;
-    const url = `https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(keyword)}&page=1`;
-    const data = await fetchJson2(
-      url,
-      BILI_SEARCH
-    );
-    for (const item of data.data?.result ?? []) {
-      const bvid = String(item.bvid ?? "");
-      if (!bvid || seenBvid.has(bvid)) continue;
-      seenBvid.add(bvid);
-      const rawTitle = String(item.title ?? "");
-      const parsed = parseSongFromText(rawTitle, hint);
-      if (!parsed.title || parsed.title.length < 2) continue;
-      if (isRemixOrLive(parsed.title) && !/live|版|dj|remix/i.test(query)) continue;
-      const durationText = String(item.duration ?? "0:0");
-      const [m, s] = durationText.split(":").map(Number);
-      const pic = item.pic ? String(item.pic) : void 0;
-      results.push({
-        id: `internet:${bvid}`,
-        title: cleanSongTitle(parsed.title),
-        artist: cleanArtist(parsed.artist),
-        album: "",
-        durationMs: ((m || 0) * 60 + (s || 0)) * 1e3,
-        coverUrl: pic?.startsWith("//") ? `https:${pic}` : pic,
-        source: "internet",
-        playBvid: bvid
-      });
-      if (results.length >= limit) return results;
-    }
-  }
-  return results;
 }
 async function searchItunes(query, limit) {
   const hint = splitQuery(query);
   const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=${limit}&country=CN`;
-  const data = await fetchJson2(url);
+  const data = await fetchJson(url);
   const results = [];
   for (const item of data.results ?? []) {
     const id = String(item.trackId ?? "");
@@ -2461,27 +2302,16 @@ function dedupeOnePerSong(items, query) {
   }
   return [...best.values()].sort((a, b) => scoreCandidate(query, b) - scoreCandidate(query, a));
 }
-async function attachAudioUrl(item) {
-  if (item.source === "itunes") return item;
-  const bvid = item.playBvid ?? item.id.replace("internet:", "");
-  if (!bvid) return item;
-  const audioUrl = await getBilibiliAudioUrl(bvid);
-  return audioUrl ? { ...item, previewUrl: audioUrl, playBvid: bvid } : item;
-}
 async function searchMusicOnline(query, limit = 20) {
   const q = query.trim();
   if (!q) throw new Error("\u8BF7\u8F93\u5165\u641C\u7D22\u5173\u952E\u8BCD");
   const hint = splitQuery(q);
-  const [internet, itunes] = await Promise.all([
-    searchInternet(q, limit * 3).catch(() => []),
-    searchItunes(q, limit * 2).catch(() => [])
-  ]);
-  const merged = dedupeOnePerSong([...internet, ...itunes], hint);
+  const itunes = await searchItunes(q, limit * 2).catch(() => []);
+  const merged = dedupeOnePerSong(itunes, hint);
   const relevant = merged.filter((item) => isRelevantResult(item, hint));
   const picked = (relevant.length ? relevant : merged).slice(0, limit);
-  const enriched = await Promise.all(picked.map((item) => attachAudioUrl(item).catch(() => item)));
-  if (!enriched.length) throw new Error("\u672A\u627E\u5230\u76F8\u5173\u6B4C\u66F2\uFF0C\u8BF7\u6362\u5173\u952E\u8BCD\u6216\u4E0A\u4F20\u672C\u5730\u6587\u4EF6");
-  return enriched;
+  if (!picked.length) throw new Error("\u672A\u627E\u5230\u76F8\u5173\u6B4C\u66F2\uFF0C\u8BF7\u6362\u5173\u952E\u8BCD\u6216\u4E0A\u4F20\u672C\u5730\u6587\u4EF6");
+  return picked;
 }
 function detectPlatform(url) {
   const lower = url.toLowerCase();
@@ -2497,14 +2327,14 @@ function extractBvid(url) {
 async function parseBilibili(url) {
   const bvid = extractBvid(url);
   if (!bvid) throw new Error("\u65E0\u6CD5\u8BC6\u522B Bilibili \u89C6\u9891\u94FE\u63A5");
-  const info = await fetchJson2(
+  const info = await fetchJson(
     `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
     "https://www.bilibili.com"
   );
   if (info.code !== 0) throw new Error(info.message ?? "Bilibili API \u9519\u8BEF");
   const data = info.data;
   const cid = Number(data.cid);
-  const play = await fetchJson2(
+  const play = await fetchJson(
     `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${cid}&fnval=16&qn=0`,
     "https://www.bilibili.com"
   );
@@ -2549,6 +2379,17 @@ async function parseMediaUrl(url) {
     };
   }
   throw new Error("\u6682\u4E0D\u652F\u6301\u8BE5\u5E73\u53F0\uFF0C\u76EE\u524D\u652F\u6301: Bilibili\u3001\u6296\u97F3\u3001\u5C0F\u7EA2\u4E66");
+}
+
+// shared/src/library/resolve.ts
+async function resolveMusicAudioUrl(result) {
+  if (result.previewUrl) {
+    return {
+      url: result.previewUrl,
+      ext: result.previewUrl.includes(".m4a") ? "m4a" : "mp3"
+    };
+  }
+  throw new Error("\u6682\u65F6\u65E0\u6CD5\u89E3\u6790\u8BE5\u6B4C\u66F2\uFF0C\u8BF7\u6362\u4E00\u6761\u7ED3\u679C\u6216\u4E0A\u4F20\u672C\u5730\u6587\u4EF6");
 }
 
 // desound/web/backend/src/library/store.ts
@@ -2824,11 +2665,8 @@ app.post("/library/import-search", async (c) => {
     if (previewUrl) {
       const ext = previewUrl.includes(".m4a") || previewUrl.includes("m4s") ? "m4a" : "mp3";
       const dest2 = path2.join(tmp, `search.${ext}`);
-      try {
-        await downloadHttp(previewUrl, dest2, "https://www.bilibili.com");
-        return c.json(importFile(dest2, displayName, tags, "music", sourceLabel));
-      } catch {
-      }
+      await downloadHttp(previewUrl, dest2);
+      return c.json(importFile(dest2, displayName, tags, "music", sourceLabel));
     }
     const resolved = await resolveMusicAudioUrl({
       id: resultId,
@@ -2854,7 +2692,7 @@ app.get("/search/play", async (c) => {
   const title = c.req.query("title") ?? "";
   const artist = c.req.query("artist") ?? "";
   const source = c.req.query("source") ?? "";
-  const playBvid = c.req.query("playBvid") ?? "";
+  const previewUrl = c.req.query("previewUrl") ?? "";
   try {
     const resolved = await resolveMusicAudioUrl({
       id: resultId,
@@ -2863,7 +2701,7 @@ app.get("/search/play", async (c) => {
       album: "",
       durationMs: 0,
       source,
-      playBvid: playBvid || void 0
+      previewUrl: previewUrl || void 0
     });
     const headers = { "User-Agent": "Mozilla/5.0" };
     if (resolved.referer) headers.Referer = resolved.referer;

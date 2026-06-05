@@ -113,12 +113,8 @@ app.post("/library/import-search", async (c) => {
     if (previewUrl) {
       const ext = previewUrl.includes(".m4a") || previewUrl.includes("m4s") ? "m4a" : "mp3";
       const dest = path.join(tmp, `search.${ext}`);
-      try {
-        await downloadHttp(previewUrl, dest, "https://www.bilibili.com");
-        return c.json(importFile(dest, displayName, tags, "music", sourceLabel));
-      } catch {
-        /* preview link expired, resolve again below */
-      }
+      await downloadHttp(previewUrl, dest);
+      return c.json(importFile(dest, displayName, tags, "music", sourceLabel));
     }
 
     const resolved = await resolveMusicAudioUrl({
@@ -146,8 +142,7 @@ app.get("/search/play", async (c) => {
   const title = c.req.query("title") ?? "";
   const artist = c.req.query("artist") ?? "";
   const source = c.req.query("source") ?? "";
-
-  const playBvid = c.req.query("playBvid") ?? "";
+  const previewUrl = c.req.query("previewUrl") ?? "";
 
   try {
     const resolved = await resolveMusicAudioUrl({
@@ -157,7 +152,7 @@ app.get("/search/play", async (c) => {
       album: "",
       durationMs: 0,
       source,
-      playBvid: playBvid || undefined,
+      previewUrl: previewUrl || undefined,
     });
 
     const headers: Record<string, string> = { "User-Agent": "Mozilla/5.0" };

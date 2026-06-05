@@ -13,12 +13,10 @@ export const PLATFORM_LABELS: Record<string, string> = {
   bilibili: "Bilibili",
   douyin: "抖音",
   xiaohongshu: "小红书",
-  internet: "互联网",
   itunes: "iTunes",
 };
 
 export const MUSIC_SOURCE_LABELS: Record<string, string> = {
-  internet: "互联网音源",
   itunes: "iTunes",
 };
 

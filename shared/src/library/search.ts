@@ -1,18 +1,14 @@
 import type { LinkParseResult, MusicSearchResult } from "../types";
 import { USER_AGENT } from "../constants";
-import { getBilibiliAudioUrl } from "./resolve";
 import {
   cleanArtist,
   cleanSongTitle,
   formatResultLabel,
   isRemixOrLive,
-  parseSongFromText,
   normalizeSongTitle,
   songKey,
   splitQuery,
 } from "./parseTitle";
-
-const BILI_SEARCH = "https://search.bilibili.com";
 
 async function fetchJson<T>(url: string, referer?: string): Promise<T> {
   const headers: Record<string, string> = { "User-Agent": USER_AGENT };
@@ -43,9 +39,8 @@ function scoreCandidate(
   else if (qt && title.includes(qt)) score += 80;
   if (qa && artist.includes(qa)) score += 100;
   if (item.album) score += 40;
-  if (item.previewUrl || item.playBvid) score += 30;
-  if (item.source === "internet" && item.previewUrl) score += 25;
-  if (item.source === "itunes" && item.album && !/live|现场/i.test(item.album)) score += 20;
+  if (item.previewUrl) score += 30;
+  if (item.album && !/live|现场/i.test(item.album)) score += 20;
   if (isRemixOrLive(item.title) && !/live|版|dj|remix/i.test(query.title + query.artist)) score -= 80;
   if (item.album && /live|现场/i.test(item.album) && !/live|现场/i.test(query.title + query.artist)) {
     score -= 70;
@@ -86,58 +81,8 @@ function mergeResult(base: MusicSearchResult, other: MusicSearchResult): MusicSe
     album: base.album || other.album,
     coverUrl: base.coverUrl || other.coverUrl,
     previewUrl: base.previewUrl || other.previewUrl,
-    playBvid: base.playBvid || other.playBvid,
     durationMs: base.durationMs || other.durationMs,
   };
-}
-
-/** 互联网音源：Bilibili 搜索 + 直链解析（不调用网易云/QQ/酷狗 API） */
-async function searchInternet(query: string, limit: number): Promise<MusicSearchResult[]> {
-  const hint = splitQuery(query);
-  const keywords = [query.trim(), hint.title, `${hint.artist} ${hint.title}`.trim()].filter(
-    (v, i, a) => v && a.indexOf(v) === i,
-  );
-
-  const results: MusicSearchResult[] = [];
-  const seenBvid = new Set<string>();
-
-  for (const keyword of keywords) {
-    if (!keyword) continue;
-    const url = `https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(keyword)}&page=1`;
-    const data = await fetchJson<{ data?: { result?: Record<string, unknown>[] } }>(
-      url,
-      BILI_SEARCH,
-    );
-
-    for (const item of data.data?.result ?? []) {
-      const bvid = String(item.bvid ?? "");
-      if (!bvid || seenBvid.has(bvid)) continue;
-      seenBvid.add(bvid);
-
-      const rawTitle = String(item.title ?? "");
-      const parsed = parseSongFromText(rawTitle, hint);
-      if (!parsed.title || parsed.title.length < 2) continue;
-      if (isRemixOrLive(parsed.title) && !/live|版|dj|remix/i.test(query)) continue;
-
-      const durationText = String(item.duration ?? "0:0");
-      const [m, s] = durationText.split(":").map(Number);
-      const pic = item.pic ? String(item.pic) : undefined;
-
-      results.push({
-        id: `internet:${bvid}`,
-        title: cleanSongTitle(parsed.title),
-        artist: cleanArtist(parsed.artist),
-        album: "",
-        durationMs: ((m || 0) * 60 + (s || 0)) * 1000,
-        coverUrl: pic?.startsWith("//") ? `https:${pic}` : pic,
-        source: "internet",
-        playBvid: bvid,
-      });
-      if (results.length >= limit) return results;
-    }
-  }
-
-  return results;
 }
 
 async function searchItunes(query: string, limit: number): Promise<MusicSearchResult[]> {
@@ -196,31 +141,18 @@ function dedupeOnePerSong(
   return [...best.values()].sort((a, b) => scoreCandidate(query, b) - scoreCandidate(query, a));
 }
 
-async function attachAudioUrl(item: MusicSearchResult): Promise<MusicSearchResult> {
-  if (item.source === "itunes") return item;
-  const bvid = item.playBvid ?? item.id.replace("internet:", "");
-  if (!bvid) return item;
-  const audioUrl = await getBilibiliAudioUrl(bvid);
-  return audioUrl ? { ...item, previewUrl: audioUrl, playBvid: bvid } : item;
-}
-
 export async function searchMusicOnline(query: string, limit = 20): Promise<MusicSearchResult[]> {
   const q = query.trim();
   if (!q) throw new Error("请输入搜索关键词");
 
   const hint = splitQuery(q);
-  const [internet, itunes] = await Promise.all([
-    searchInternet(q, limit * 3).catch(() => []),
-    searchItunes(q, limit * 2).catch(() => []),
-  ]);
-
-  const merged = dedupeOnePerSong([...internet, ...itunes], hint);
+  const itunes = await searchItunes(q, limit * 2).catch(() => []);
+  const merged = dedupeOnePerSong(itunes, hint);
   const relevant = merged.filter((item) => isRelevantResult(item, hint));
   const picked = (relevant.length ? relevant : merged).slice(0, limit);
-  const enriched = await Promise.all(picked.map((item) => attachAudioUrl(item).catch(() => item)));
 
-  if (!enriched.length) throw new Error("未找到相关歌曲，请换关键词或上传本地文件");
-  return enriched;
+  if (!picked.length) throw new Error("未找到相关歌曲，请换关键词或上传本地文件");
+  return picked;
 }
 
 export { formatResultLabel };

@@ -29,6 +29,11 @@ function rmDir(dir) {
   if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
 }
 
+function copyApiBundle(from, toDir) {
+  fs.mkdirSync(toDir, { recursive: true });
+  fs.copyFileSync(from, path.join(toDir, "index.js"));
+}
+
 console.log("=== Everec unified Vercel build ===");
 
 run("npm run build:vercel-api");
@@ -63,23 +68,14 @@ for (const app of apps) {
   copyDir(path.join(root, app.src), dest);
 }
 
-const apiDest = path.join(portalDist, "api");
-fs.mkdirSync(apiDest, { recursive: true });
-fs.copyFileSync(path.join(root, "api/index.js"), path.join(apiDest, "index.js"));
-
-const knowgoApiDest = path.join(apiDest, "knowgo");
-fs.mkdirSync(knowgoApiDest, { recursive: true });
-fs.copyFileSync(
-  path.join(root, "knowgo/api/index.js"),
-  path.join(knowgoApiDest, "index.js"),
-);
-
-const prerectorApiDest = path.join(apiDest, "prerector");
-fs.mkdirSync(prerectorApiDest, { recursive: true });
-fs.copyFileSync(
+// Vercel Serverless Functions live at repo-root api/, NOT inside portal/dist
+copyApiBundle(path.join(root, "api/index.js"), path.join(root, "api"));
+copyApiBundle(path.join(root, "knowgo/api/index.js"), path.join(root, "api/knowgo"));
+copyApiBundle(
   path.join(root, "prerector/api/index.js"),
-  path.join(prerectorApiDest, "index.js"),
+  path.join(root, "api/prerector"),
 );
 
 console.log("\n=== Build complete ===");
-console.log(`Output: ${portalDist}`);
+console.log(`Portal static: ${portalDist}`);
+console.log("API functions: api/index.js, api/knowgo/index.js, api/prerector/index.js");

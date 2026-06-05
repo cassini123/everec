@@ -7,6 +7,7 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   design: "设计 / UI",
   software: "软件 / 开发",
   campaign: "营销 / 活动",
+  homework: "小组作业",
   general: "通用项目",
 };
 
@@ -16,6 +17,7 @@ export const SCOPE_LABELS: Record<Exclude<ProjectType, "auto">, { label: string;
   design: { label: "页面/屏幕数", unit: "页", default: 5 },
   software: { label: "功能模块数", unit: "个", default: 8 },
   campaign: { label: "活动周期", unit: "天", default: 14 },
+  homework: { label: "作业周期", unit: "天", default: 10 },
   general: { label: "预估工期", unit: "天", default: 7 },
 };
 

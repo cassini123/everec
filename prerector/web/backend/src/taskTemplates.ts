@@ -60,6 +60,15 @@ export const TEMPLATES_BY_TYPE: Record<Exclude<ProjectType, "auto">, TaskTemplat
     { title: "评审修改", phase: "评审", description: "内部评审、反馈收集与迭代", baseHours: 4, baseDifficulty: 2, keywords: ["评审", "反馈", "修改"] },
     { title: "验收交付", phase: "交付", description: "最终验收、归档与总结", baseHours: 2, baseDifficulty: 1, keywords: ["验收", "交付", "总结"] },
   ],
+  homework: [
+    { title: "选题与小组分工", phase: "启动", description: "确定作业题目、角色与截止时间", baseHours: 2, baseDifficulty: 2, keywords: ["分工", "选题", "小组"] },
+    { title: "资料调研", phase: "调研", description: "文献、案例与参考资料收集整理", baseHours: 6, baseDifficulty: 2, keywords: ["调研", "文献", "资料"] },
+    { title: "个人部分撰写", phase: "执行", description: "各成员完成负责章节或模块", baseHours: 10, baseDifficulty: 3, keywords: ["撰写", "章节", "个人"] },
+    { title: "合并与统稿", phase: "协作", description: "汇总内容、统一格式与逻辑", baseHours: 5, baseDifficulty: 3, keywords: ["合并", "统稿", "格式"] },
+    { title: "互评与修改", phase: "评审", description: "组内互审、根据反馈迭代", baseHours: 4, baseDifficulty: 2, keywords: ["互评", "修改", "反馈"] },
+    { title: "答辩/展示准备", phase: "评审", description: "PPT、演讲稿与演示排练", baseHours: 4, baseDifficulty: 3, keywords: ["答辩", "展示", "ppt"] },
+    { title: "提交与验收", phase: "交付", description: "最终提交、查重与确认", baseHours: 2, baseDifficulty: 1, keywords: ["提交", "deadline", "验收"] },
+  ],
 };
 
 const TYPE_KEYWORDS: Record<Exclude<ProjectType, "auto">, RegExp[]> = {
@@ -68,6 +77,7 @@ const TYPE_KEYWORDS: Record<Exclude<ProjectType, "auto">, RegExp[]> = {
   design: [/设计|ui|ux|界面|视觉|原型|线框|figma|品牌/i],
   software: [/开发|软件|api|后端|前端|系统|app|代码|功能模块/i],
   campaign: [/营销|活动|投放|推广|campaign|广告|社媒|品牌传播/i],
+  homework: [/作业|课程|小组|论文|报告|presentation|assignment|groupwork|期末|大作业/i],
   general: [],
 };
 
@@ -80,6 +90,7 @@ export function detectProjectType(brief: string, hint?: ProjectType): Exclude<Pr
     design: 0,
     software: 0,
     campaign: 0,
+    homework: 0,
     general: 0,
   };
 
@@ -119,10 +130,11 @@ export function parseTaskInput(input: string): ParsedTaskInput[] {
 
 function inferPhase(title: string, description: string): string {
   const text = `${title} ${description}`;
-  if (/启动|kickoff|brief|策划|需求|调研|前期/.test(text)) return "前期";
+  if (/启动|kickoff|brief|策划|需求|调研|前期|选题/.test(text)) return "前期";
   if (/设计|原型|线框|视觉|ui/.test(text)) return "设计";
-  if (/开发|编码|实现|制作|拍摄|录音/.test(text)) return "制作";
-  if (/测试|联调|qa|审片|评审/.test(text)) return "评审";
-  if (/部署|交付|导出|上线|验收|复盘/.test(text)) return "交付";
+  if (/开发|编码|实现|制作|拍摄|录音|撰写/.test(text)) return "执行";
+  if (/测试|联调|qa|审片|评审|互评|答辩/.test(text)) return "评审";
+  if (/部署|交付|导出|上线|验收|复盘|提交/.test(text)) return "交付";
+  if (/合并|统稿|协作|分工/.test(text)) return "协作";
   return "执行";
 }

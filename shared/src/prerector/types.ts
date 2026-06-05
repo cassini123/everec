@@ -2,6 +2,8 @@ export type PrerectorWorkspace =
   | "dashboard"
   | "tasks"
   | "teams"
+  | "friends"
+  | "chat"
   | "sync"
   | "reminders";
 
@@ -16,19 +18,51 @@ export type ProjectType =
   | "design"
   | "software"
   | "campaign"
+  | "homework"
   | "general";
+
+export interface User {
+  id: string;
+  name: string;
+  handle: string;
+  avatarColor: string;
+  bio?: string;
+  createdAt: string;
+}
+
+export type FriendRequestStatus = "pending" | "accepted" | "rejected";
+
+export interface FriendRequest {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  status: FriendRequestStatus;
+  message?: string;
+  createdAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  teamId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+}
 
 export interface TeamMember {
   id: string;
   name: string;
   role: MemberRole;
   color: string;
+  userId?: string;
 }
 
 export interface Team {
   id: string;
   name: string;
   members: TeamMember[];
+  kind?: "production" | "homework";
   createdAt: string;
 }
 
@@ -132,4 +166,7 @@ export interface DashboardStats {
   totalEstimatedHours: number;
   upcomingReminders: Reminder[];
   activeSyncSessions: number;
+  friendCount: number;
+  pendingFriendRequests: number;
+  unreadChatCount: number;
 }

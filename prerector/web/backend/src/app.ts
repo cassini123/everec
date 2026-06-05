@@ -8,6 +8,7 @@ import type {
 } from "@everec/shared";
 import { DIFFICULTY_LABELS } from "@everec/shared";
 import {
+  acceptFriendRequest,
   assignTask,
   createReminder,
   createTeam,
@@ -15,12 +16,22 @@ import {
   dismissReminder,
   getDashboard,
   getDueReminders,
+  getMe,
+  listChatMessages,
+  listFriendRequests,
+  listFriends,
   listProjects,
   listReminders,
   listSyncSessions,
   listTasks,
   listTeams,
+  markChatRead,
   rebalanceTeamTasks,
+  rejectFriendRequest,
+  resolveUserId,
+  searchUsers,
+  sendChatMessage,
+  sendFriendRequest,
   startSync,
   tickSync,
   updateTaskStatus,
@@ -30,9 +41,13 @@ import { assessCustomTask } from "./taskAssessment";
 import { detectProjectType } from "./taskTemplates";
 import { SCOPE_LABELS } from "@everec/shared";
 
-const app = new Hono().basePath("/api");
+const app = new Hono<{ Variables: { userId: string } }>().basePath("/api");
 
 app.use("*", cors());
+app.use("*", async (c, next) => {
+  c.set("userId", resolveUserId(c.req.header("X-User-Id")));
+  await next();
+});
 
 app.onError((err, c) => {
   console.error("[prerector api]", err);
@@ -43,7 +58,65 @@ app.get("/health", (c) =>
   c.json({ ok: true, platform: "prerector", module: "collaboration" }),
 );
 
-app.get("/dashboard", (c) => c.json(getDashboard()));
+app.get("/users/me", (c) => c.json(getMe(c.get("userId"))));
+
+app.get("/users/search", (c) => {
+  const q = c.req.query("q") ?? "";
+  return c.json(searchUsers(q, c.get("userId")));
+});
+
+app.get("/friends", (c) => c.json(listFriends(c.get("userId"))));
+
+app.get("/friends/requests", (c) => c.json(listFriendRequests(c.get("userId"))));
+
+app.post("/friends/request", async (c) => {
+  const body = await c.req.json<{ userId?: string; handle?: string; message?: string }>();
+  try {
+    return c.json(sendFriendRequest(c.get("userId"), body));
+  } catch (err) {
+    return c.json({ error: String(err) }, 400);
+  }
+});
+
+app.post("/friends/requests/:id/accept", (c) => {
+  try {
+    return c.json(acceptFriendRequest(c.req.param("id"), c.get("userId")));
+  } catch (err) {
+    return c.json({ error: String(err) }, 400);
+  }
+});
+
+app.post("/friends/requests/:id/reject", (c) => {
+  try {
+    return c.json(rejectFriendRequest(c.req.param("id"), c.get("userId")));
+  } catch (err) {
+    return c.json({ error: String(err) }, 400);
+  }
+});
+
+app.get("/chat/:teamId/messages", (c) => {
+  try {
+    return c.json(listChatMessages(c.req.param("teamId"), c.get("userId")));
+  } catch (err) {
+    return c.json({ error: String(err) }, 403);
+  }
+});
+
+app.post("/chat/:teamId/messages", async (c) => {
+  const { content } = await c.req.json<{ content: string }>();
+  try {
+    return c.json(sendChatMessage(c.req.param("teamId"), c.get("userId"), content));
+  } catch (err) {
+    return c.json({ error: String(err) }, 400);
+  }
+});
+
+app.post("/chat/:teamId/read", (c) => {
+  markChatRead(c.req.param("teamId"), c.get("userId"));
+  return c.json({ ok: true });
+});
+
+app.get("/dashboard", (c) => c.json(getDashboard(c.get("userId"))));
 
 app.get("/projects", (c) => c.json(listProjects()));
 
@@ -94,15 +167,25 @@ app.post("/tasks/assess", async (c) => {
   });
 });
 
-app.get("/teams", (c) => c.json(listTeams()));
+app.get("/teams", (c) => c.json(listTeams(c.get("userId"))));
 
 app.post("/teams", async (c) => {
-  const { name, members } = await c.req.json<{
+  const body = await c.req.json<{
     name: string;
-    members: Omit<TeamMember, "id">[];
+    members?: Omit<TeamMember, "id">[];
+    friendUserIds?: string[];
+    kind?: "production" | "homework";
   }>();
-  if (!name?.trim()) return c.json({ error: "请提供小组名称" }, 400);
-  return c.json(createTeam(name, members ?? []));
+  if (!body.name?.trim()) return c.json({ error: "请提供小组名称" }, 400);
+  return c.json(
+    createTeam({
+      name: body.name,
+      members: body.members,
+      friendUserIds: body.friendUserIds,
+      kind: body.kind,
+      ownerUserId: c.get("userId"),
+    }),
+  );
 });
 
 app.post("/teams/:id/rebalance", (c) => {
@@ -116,9 +199,7 @@ app.post("/teams/:id/rebalance", (c) => {
 app.get("/sync", (c) => {
   const projectId = c.req.query("projectId");
   const sessions = listSyncSessions(projectId);
-  return c.json(
-    sessions.map((s) => ({ ...s, stats: syncStats(s) })),
-  );
+  return c.json(sessions.map((s) => ({ ...s, stats: syncStats(s) })));
 });
 
 app.post("/sync", async (c) => {

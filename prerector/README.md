@@ -10,7 +10,9 @@
 |------|------|
 | **自动拆解 / 任务分配** | 支持视频、音频、设计、开发、营销、通用等类型；可输入自定义任务列表 |
 | **难度 / 时间评估** | 基于任务内容、项目类型与规模估算难度 (1–5) 与工时；自定义任务实时预览 |
-| **协作人员小组** | 创建导演/剪辑/调色/声音等角色小组，支持一键重新平衡工作量 |
+| **协作人员小组** | 制作组 / 小组作业群，从好友邀请成员，一键重新平衡工作量 |
+| **加好友** | 搜索用户、发送/接受好友请求 |
+| **小组群聊** | 每个小组独立群聊，实时消息（轮询） |
 | **视频文件同步** | 代理优先策略：先同步 proxy 与时间轴，原始素材后台传输 |
 | **时间提醒** | 任务截止、审片节点与交付里程碑提醒 |
 
@@ -43,7 +45,13 @@ npm run dev:prerector
 | `/api/dashboard` | GET | 协作总览统计 |
 | `/api/tasks/decompose` | POST | Brief / 自定义任务拆解 |
 | `/api/tasks/assess` | POST | 单任务难度与工时评估 |
-| `/api/teams` | GET/POST | 协作小组 |
+| `/api/users/me` | GET | 当前用户 |
+| `/api/users/search` | GET | 搜索用户 |
+| `/api/friends` | GET | 好友列表 |
+| `/api/friends/request` | POST | 发送好友请求 |
+| `/api/friends/requests/:id/accept` | POST | 接受请求 |
+| `/api/teams` | GET/POST | 协作小组（含小组作业） |
+| `/api/chat/:teamId/messages` | GET/POST | 小组群聊 |
 | `/api/sync` | GET/POST | 视频同步会话 |
 | `/api/reminders` | GET/POST | 时间提醒 |
 

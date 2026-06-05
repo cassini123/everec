@@ -1,9 +1,11 @@
 import type {
   AssessTaskRequest,
   AssessTaskResult,
+  ChatMessage,
   DashboardStats,
   DecomposeRequest,
   DecomposeResult,
+  FriendRequest,
   PrerectorProject,
   PrerectorTask,
   Reminder,
@@ -11,6 +13,7 @@ import type {
   TaskStatus,
   Team,
   TeamMember,
+  User,
 } from "@everec/shared";
 export {
   PROJECT_TYPE_LABELS,
@@ -18,9 +21,23 @@ export {
   DIFFICULTY_LABELS,
 } from "@everec/shared";
 
+const USER_KEY = "prerector_user_id";
+
+export function getStoredUserId(): string {
+  return localStorage.getItem(USER_KEY) ?? "user-me";
+}
+
+export function setStoredUserId(id: string) {
+  localStorage.setItem(USER_KEY, id);
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      "X-User-Id": getStoredUserId(),
+      ...init?.headers,
+    },
     ...init,
   });
   const data = await res.json();
@@ -32,7 +49,27 @@ export type SyncSessionWithStats = SyncSession & {
   stats: { total: number; done: number; bytesTotal: number; bytesDone: number; percent: number };
 };
 
+export type FriendRequestWithUser = FriendRequest & { fromUser: User };
+
 export const api = {
+  getMe: () => req<User>("/users/me"),
+  searchUsers: (q: string) => req<User[]>(`/users/search?q=${encodeURIComponent(q)}`),
+  listFriends: () => req<User[]>("/friends"),
+  listFriendRequests: () => req<FriendRequestWithUser[]>("/friends/requests"),
+  sendFriendRequest: (body: { userId?: string; handle?: string; message?: string }) =>
+    req<FriendRequest>("/friends/request", { method: "POST", body: JSON.stringify(body) }),
+  acceptFriendRequest: (id: string) =>
+    req<FriendRequest>(`/friends/requests/${id}/accept`, { method: "POST" }),
+  rejectFriendRequest: (id: string) =>
+    req<FriendRequest>(`/friends/requests/${id}/reject`, { method: "POST" }),
+  listChatMessages: (teamId: string) => req<ChatMessage[]>(`/chat/${teamId}/messages`),
+  sendChatMessage: (teamId: string, content: string) =>
+    req<ChatMessage>(`/chat/${teamId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    }),
+  markChatRead: (teamId: string) =>
+    req<{ ok: boolean }>(`/chat/${teamId}/read`, { method: "POST" }),
   getDashboard: () => req<DashboardStats>("/dashboard"),
   listProjects: () => req<PrerectorProject[]>("/projects"),
   listTasks: (projectId?: string) =>
@@ -52,8 +89,12 @@ export const api = {
   assessTask: (body: AssessTaskRequest) =>
     req<AssessTaskResult>("/tasks/assess", { method: "POST", body: JSON.stringify(body) }),
   listTeams: () => req<Team[]>("/teams"),
-  createTeam: (name: string, members: Omit<TeamMember, "id">[]) =>
-    req<Team>("/teams", { method: "POST", body: JSON.stringify({ name, members }) }),
+  createTeam: (body: {
+    name: string;
+    members?: Omit<TeamMember, "id">[];
+    friendUserIds?: string[];
+    kind?: "production" | "homework";
+  }) => req<Team>("/teams", { method: "POST", body: JSON.stringify(body) }),
   rebalanceTeam: (teamId: string) =>
     req<PrerectorTask[]>(`/teams/${teamId}/rebalance`, { method: "POST" }),
   listSync: (projectId?: string) =>
@@ -96,6 +137,11 @@ export function formatDue(iso: string): string {
   return `${Math.floor(hours / 24)}d 后`;
 }
 
+export function formatChatTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 export const ROLE_LABELS: Record<string, string> = {
   director: "导演",
   editor: "剪辑",
@@ -110,4 +156,9 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   in_progress: "进行中",
   review: "审片中",
   done: "完成",
+};
+
+export const TEAM_KIND_LABELS = {
+  production: "制作组",
+  homework: "小组作业",
 };

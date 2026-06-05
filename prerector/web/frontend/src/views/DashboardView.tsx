@@ -5,6 +5,8 @@ import {
   CloudUpload,
   ListTodo,
   Loader2,
+  MessageCircle,
+  UserPlus,
 } from "lucide-react";
 import type { DashboardStats, PrerectorProject } from "@everec/shared";
 import { PROJECT_TYPE_LABELS, formatDue } from "../lib/api";
@@ -58,7 +60,7 @@ export function DashboardView({ stats, projects, loading }: DashboardViewProps) 
       <div>
         <h1 className="text-lg font-semibold text-pr-text">协作制片总览</h1>
         <p className="mt-1 text-sm text-pr-muted">
-          支持视频、设计、开发、营销等多类型项目 — 自动拆解、评估难度与工时
+          视频、设计、开发、小组作业等多类型项目 — 好友协作与群聊
         </p>
       </div>
 
@@ -71,11 +73,22 @@ export function DashboardView({ stats, projects, loading }: DashboardViewProps) 
           color="text-pr-green"
         />
         <StatCard
-          label="进行中"
-          value={stats.inProgressTasks}
-          sub="当前活跃任务"
-          icon={ListTodo}
-          color="text-pr-blue"
+          label="好友"
+          value={stats.friendCount}
+          sub={
+            stats.pendingFriendRequests > 0
+              ? `${stats.pendingFriendRequests} 条待处理请求`
+              : "协作伙伴"
+          }
+          icon={UserPlus}
+          color="text-pr-green"
+        />
+        <StatCard
+          label="群聊未读"
+          value={stats.unreadChatCount}
+          sub="小组消息"
+          icon={MessageCircle}
+          color="text-pr-accent"
         />
         <StatCard
           label="预估工时"
@@ -84,12 +97,29 @@ export function DashboardView({ stats, projects, loading }: DashboardViewProps) 
           icon={Clock}
           color="text-pr-orange"
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <StatCard
+          label="进行中"
+          value={stats.inProgressTasks}
+          sub="当前活跃任务"
+          icon={ListTodo}
+          color="text-pr-blue"
+        />
         <StatCard
           label="同步会话"
           value={stats.activeSyncSessions}
           sub="文件传输中"
           icon={CloudUpload}
           color="text-pr-accent"
+        />
+        <StatCard
+          label="近期提醒"
+          value={stats.upcomingReminders.length}
+          sub="待关注"
+          icon={Bell}
+          color="text-pr-red"
         />
       </div>
 

@@ -43,7 +43,6 @@ export function PianoRoll({
   selectedTrack,
   beats,
   position,
-  playing,
   selectedClipId,
   activeNotes,
   trackColor,

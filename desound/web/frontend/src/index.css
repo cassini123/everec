@@ -95,6 +95,11 @@ input[type="range"] {
   animation: wave 1.2s ease-in-out infinite;
 }
 
+.sim-cut-preview-bar {
+  transform-origin: bottom;
+  animation: sim-cut-pulse 720ms steps(2, jump-none) infinite;
+}
+
 @keyframes wave {
   0%,
   100% {
@@ -102,5 +107,17 @@ input[type="range"] {
   }
   50% {
     transform: scaleY(1);
+  }
+}
+
+@keyframes sim-cut-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.42);
+    filter: brightness(0.85);
+  }
+  50% {
+    transform: scaleY(1);
+    filter: brightness(1.25);
   }
 }

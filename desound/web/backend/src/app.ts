@@ -25,6 +25,15 @@ app.onError((err, c) => {
   return c.json({ error: err.message || "服务器内部错误" }, 500);
 });
 
+function inferAudioExt(url: string, fileType?: string): string {
+  const explicit = fileType?.toLowerCase().replace(/^\./, "");
+  if (explicit && /^[a-z0-9]+$/.test(explicit)) return explicit;
+  const pathname = url.split("?")[0].split("#")[0];
+  const match = pathname.match(/\.([a-z0-9]{2,5})$/i);
+  if (match?.[1]) return match[1].toLowerCase();
+  return "mp3";
+}
+
 app.get("/health", (c) =>
   c.json({
     ok: true,
@@ -184,6 +193,7 @@ app.get("/search/play", async (c) => {
   const artist = c.req.query("artist") ?? "";
   const source = c.req.query("source") ?? "";
   const previewUrl = c.req.query("previewUrl") ?? "";
+  const playBvid = c.req.query("playBvid") ?? "";
 
   try {
     const resolved = await resolveMusicAudioUrl({
@@ -194,6 +204,7 @@ app.get("/search/play", async (c) => {
       durationMs: 0,
       source,
       previewUrl: previewUrl || undefined,
+      playBvid: playBvid || undefined,
     });
 
     const headers: Record<string, string> = { "User-Agent": "Mozilla/5.0" };
@@ -329,17 +340,19 @@ app.get("/search/sfx", async (c) => {
 });
 
 app.post("/library/import-sfx", async (c) => {
-  const { title, previewUrl, source } = await c.req.json<{
+  const { title, previewUrl, source, fileType, referer } = await c.req.json<{
     id: string;
     title: string;
     previewUrl: string;
     source: string;
+    fileType?: string;
+    referer?: string;
   }>();
   const tmp = tempDir();
   try {
-    const ext = previewUrl.includes(".wav") ? "wav" : "mp3";
+    const ext = inferAudioExt(previewUrl, fileType);
     const dest = path.join(tmp, `sfx.${ext}`);
-    await downloadHttp(previewUrl, dest);
+    await downloadHttp(previewUrl, dest, referer);
     return c.json(
       importFile(dest, title, ["foley", "sfx", source], "foley", `sfx:${source}`),
     );

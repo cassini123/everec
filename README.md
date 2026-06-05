@@ -4,6 +4,7 @@
 
 | 项目 | 路径 | 说明 |
 |------|------|------|
+| **主脑 (Hub)** | `hub/` | Creative OS 中央启动器（统筹全部应用） |
 | **Simcut** | `simcut/` | 轻量视频剪辑（Web + 桌面） |
 | **desound** | `desound/` | 音频 / 音效创作 |
 | **Knowgo** | `knowgo/` | 视觉灵感认知 + Project Graph |
@@ -16,6 +17,7 @@
 | 入口 | 路径 |
 |------|------|
 | **Everec 总览** | `/` |
+| **主脑 (Hub)** | `/apps/hub/` |
 | **Simcut** | `/apps/simcut/` |
 | **Desound** | `/apps/desound/` |
 | **Knowgo** | `/apps/knowgo/` |
@@ -49,6 +51,7 @@ curl -H "X-User-Id: user-me" https://<域名>/api/prerector/health
 npm install
 
 npm run dev:portal      # 统一门户 · http://localhost:1410
+npm run dev:hub         # 主脑 Hub · http://localhost:1400
 npm run dev:simcut      # Simcut Web · :1421
 npm run dev:web         # Desound Web · :1420
 npm run dev:knowgo      # Knowgo · :1422
@@ -62,6 +65,7 @@ npm run dev:prerector   # Prerector · :1423
 ```text
 everec/
 ├── portal/           # 统一 Web 门户（Vercel 输出）
+├── hub/              # 主脑 — Creative OS 启动器
 ├── simcut/
 ├── desound/
 ├── knowgo/

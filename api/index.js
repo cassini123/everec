@@ -2163,25 +2163,9 @@ import path2 from "node:path";
 // shared/src/constants.ts
 var USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-// shared/src/knowgo/urlParse.ts
+// shared/src/media/extract.ts
 var MOBILE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1";
 var URL_IN_TEXT_RE = /https?:\/\/[^\s<>"'`，。；！？、【】《》]+/i;
-function detectPlatform(url) {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    if (host.includes("bilibili") || host === "b23.tv") return "bilibili";
-    if (host.includes("douyin") || host.includes("tiktok") || host.includes("iesdouyin")) return "douyin";
-    if (host.includes("xiaohongshu") || host.includes("xhslink")) return "xiaohongshu";
-    if (host.includes("youtube") || host.includes("youtu.be")) return "youtube";
-    if (host.includes("vimeo")) return "vimeo";
-    if (host.includes("behance")) return "behance";
-    if (host.includes("pinterest")) return "pinterest";
-    if (host.includes("instagram")) return "instagram";
-    return host;
-  } catch {
-    return "unknown";
-  }
-}
 function extractUrlFromText(input) {
   const trimmed = input.trim();
   if (!trimmed) return trimmed;
@@ -2204,10 +2188,29 @@ function normalizeUrl(url) {
     return url;
   }
 }
-async function fetchJson(url, referer) {
-  const headers = { "User-Agent": USER_AGENT };
+function detectMediaPlatform(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    if (host.includes("bilibili") || host === "b23.tv") return "bilibili";
+    if (host.includes("douyin") || host.includes("iesdouyin")) return "douyin";
+    if (host.includes("tiktok") || host === "vm.tiktok.com" || host === "vt.tiktok.com") return "tiktok";
+    if (host.includes("xiaohongshu") || host.includes("xhslink")) return "xiaohongshu";
+    if (host.includes("youtube") || host === "youtu.be") return "youtube";
+    if (host.includes("instagram")) return "instagram";
+    if (host.includes("twitter") || host === "x.com") return "twitter";
+    if (host.includes("facebook") || host === "fb.watch") return "facebook";
+    if (host.includes("vimeo")) return "vimeo";
+    if (host.includes("weibo")) return "weibo";
+    if (host.includes("kuaishou") || host.includes("gifshow")) return "kuaishou";
+    return host;
+  } catch {
+    return "unknown";
+  }
+}
+async function fetchJson(url, referer, userAgent = USER_AGENT) {
+  const headers = { "User-Agent": userAgent };
   if (referer) headers.Referer = referer;
-  const res = await fetch(url, { headers, redirect: "follow", signal: AbortSignal.timeout(12e3) });
+  const res = await fetch(url, { headers, redirect: "follow", signal: AbortSignal.timeout(15e3) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -2219,6 +2222,9 @@ async function fetchHtml(url, userAgent = USER_AGENT) {
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return { html: await res.text(), finalUrl: res.url || url };
+}
+function decodeHtmlEntities(text) {
+  return text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 function extractMeta(html, property) {
   const patterns = [
@@ -2234,25 +2240,14 @@ function extractMeta(html, property) {
   return void 0;
 }
 function extractTitle(html) {
-  const og = extractMeta(html, "og:title");
-  if (og) return og;
-  const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  return m?.[1] ? decodeHtmlEntities(m[1].trim()) : void 0;
-}
-function decodeHtmlEntities(text) {
-  return text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  return extractMeta(html, "og:title") ?? html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
 }
 function deepGet(data, keys) {
   let current = data;
   for (const key of keys) {
     if (current == null || typeof current !== "object") return void 0;
     if (typeof key === "number") {
-      if (Array.isArray(current)) {
-        current = current[key];
-      } else {
-        const values = Object.values(current);
-        current = values.at(key);
-      }
+      current = Array.isArray(current) ? current[key] : Object.values(current).at(key);
     } else {
       current = current[key];
     }
@@ -2266,39 +2261,74 @@ function extractInitialState(html) {
   const match2 = html.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\})\s*<\/script>/);
   if (!match2?.[1]) return void 0;
   try {
-    const jsonText = match2[1].replace(/\bundefined\b/g, "null");
-    return JSON.parse(jsonText);
+    return JSON.parse(match2[1].replace(/\bundefined\b/g, "null"));
   } catch {
     return void 0;
   }
 }
-function extractXhsNote(state) {
-  return asRecord(deepGet(state, ["noteData", "data", "noteData"])) ?? asRecord(deepGet(state, ["note", "noteDetailMap", -1, "note"]));
+function extractJsonScript(html, id) {
+  const match2 = html.match(
+    new RegExp(`<script id="${id}" type="application/json">([^<]+)</script>`, "i")
+  );
+  if (!match2?.[1]) return void 0;
+  try {
+    const text = id === "RENDER_DATA" ? decodeURIComponent(match2[1]) : match2[1];
+    return JSON.parse(text);
+  } catch {
+    return void 0;
+  }
 }
-function extractXhsCover(note) {
-  const list = note.imageList;
-  if (!Array.isArray(list) || !list.length) return void 0;
-  const img = asRecord(list[0]);
-  const url = img?.urlDefault ?? img?.url;
-  return typeof url === "string" && url ? url : void 0;
-}
-function extractXhsVideoUrl(note) {
-  const stream = asRecord(asRecord(asRecord(note.video)?.media)?.stream);
-  if (!stream) return void 0;
-  for (const codec of ["h264", "h265", "h266", "av1"]) {
-    const entries = stream[codec];
-    if (!Array.isArray(entries) || !entries.length) continue;
-    const url = asRecord(entries[0])?.masterUrl;
-    if (typeof url === "string" && url) return url;
+function firstUrl(value) {
+  if (typeof value === "string" && value.startsWith("http")) return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const url = firstUrl(item);
+      if (url) return url;
+    }
+  }
+  if (value && typeof value === "object") {
+    const rec = value;
+    for (const key of ["url", "url_list", "urlList", "download_addr", "downloadAddr", "play_addr", "playAddr"]) {
+      const url = firstUrl(rec[key]);
+      if (url) return url;
+    }
   }
   return void 0;
 }
-function extractBvid(url) {
-  const match2 = url.match(/BV[a-zA-Z0-9]+/);
-  return match2 ? match2[0] : null;
+function findMediaUrls(obj, hints, out = [], depth = 0) {
+  if (depth > 14 || obj == null) return out;
+  if (typeof obj === "string") {
+    if (/^https?:\/\/.+/i.test(obj) && hints.some((h) => obj.includes(h))) {
+      if (/\.(mp4|m4a|mp3|m3u8)(\?|$)/i.test(obj) || obj.includes("/stream/") || obj.includes("videoplayback")) {
+        if (!out.includes(obj)) out.push(obj);
+      }
+    }
+    return out;
+  }
+  if (Array.isArray(obj)) {
+    for (const item of obj.slice(0, 40)) findMediaUrls(item, hints, out, depth + 1);
+    return out;
+  }
+  if (typeof obj === "object") {
+    for (const value of Object.values(obj).slice(0, 60)) {
+      findMediaUrls(value, hints, out, depth + 1);
+    }
+  }
+  return out;
 }
-async function parseBilibili(url) {
-  const bvid = extractBvid(url);
+function buildResult(base) {
+  return { ...base, downloads: base.downloads ?? [] };
+}
+function extractBvid(url) {
+  return url.match(/BV[a-zA-Z0-9]+/)?.[0] ?? null;
+}
+async function extractBilibili(url) {
+  let target = url;
+  if (!extractBvid(url)) {
+    const resolved = await fetchHtml(url);
+    target = resolved.finalUrl;
+  }
+  const bvid = extractBvid(target);
   if (!bvid) throw new Error("\u65E0\u6CD5\u8BC6\u522B Bilibili \u89C6\u9891\u94FE\u63A5");
   const info = await fetchJson(
     `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
@@ -2307,150 +2337,456 @@ async function parseBilibili(url) {
   if (info.code !== 0) throw new Error(info.message ?? "Bilibili API \u9519\u8BEF");
   const data = info.data ?? {};
   const owner = asRecord(data.owner);
-  return {
+  const cid = Number(data.cid);
+  const play = await fetchJson(
+    `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${cid}&fnval=4048&qn=80`,
+    "https://www.bilibili.com"
+  );
+  const downloads = [];
+  const video = play.data?.dash?.video?.[0];
+  const audio = play.data?.dash?.audio?.[0];
+  const videoUrl = video?.baseUrl ?? video?.base_url;
+  const audioUrl = audio?.baseUrl ?? audio?.base_url;
+  if (videoUrl) {
+    downloads.push({
+      url: videoUrl,
+      label: "\u65E0\u6C34\u5370\u89C6\u9891",
+      ext: "mp4",
+      kind: "video",
+      noWatermark: true,
+      referer: "https://www.bilibili.com"
+    });
+  }
+  if (audioUrl) {
+    downloads.push({
+      url: audioUrl,
+      label: "\u97F3\u9891",
+      ext: audioUrl.includes(".m4a") ? "m4a" : "mp3",
+      kind: "audio",
+      referer: "https://www.bilibili.com"
+    });
+  }
+  return buildResult({
     url,
     resolvedUrl: `https://www.bilibili.com/video/${bvid}`,
+    platform: "bilibili",
     title: String(data.title ?? "Bilibili \u89C6\u9891"),
     description: String(data.desc ?? ""),
-    imageUrl: data.pic ? String(data.pic) : void 0,
-    siteName: "\u54D4\u54E9\u54D4\u54E9",
-    platform: "bilibili",
     author: owner?.name ? String(owner.name) : void 0,
+    coverUrl: data.pic ? String(data.pic) : void 0,
     durationSec: Number(data.duration ?? 0) || void 0,
-    mediaType: "video"
-  };
+    mediaType: "video",
+    siteName: "\u54D4\u54E9\u54D4\u54E9",
+    downloads
+  });
 }
-async function parseXiaohongshu(url) {
+function extractXhsNote(state) {
+  return asRecord(deepGet(state, ["noteData", "data", "noteData"])) ?? asRecord(deepGet(state, ["note", "noteDetailMap", -1, "note"]));
+}
+async function extractXiaohongshu(url) {
   const { html, finalUrl } = await fetchHtml(url, MOBILE_USER_AGENT);
   const state = extractInitialState(html);
   const note = state ? extractXhsNote(state) : void 0;
+  const downloads = [];
   if (note) {
-    const title2 = String(note.title ?? note.desc ?? "\u5C0F\u7EA2\u4E66\u4F5C\u54C1").trim();
-    const description2 = String(note.desc ?? "").trim();
-    const imageUrl = extractXhsCover(note) ?? extractMeta(html, "og:image");
-    const videoUrl = extractXhsVideoUrl(note);
+    const imageList = note.imageList;
+    if (Array.isArray(imageList)) {
+      imageList.forEach((item, index) => {
+        const img = asRecord(item);
+        const imgUrl = img?.urlDefault ?? img?.url;
+        if (typeof imgUrl === "string" && imgUrl) {
+          downloads.push({
+            url: imgUrl,
+            label: imageList.length > 1 ? `\u56FE\u7247 ${index + 1}` : "\u5C01\u9762",
+            ext: "jpg",
+            kind: "image",
+            noWatermark: true
+          });
+        }
+      });
+    }
+    const stream = asRecord(asRecord(asRecord(note.video)?.media)?.stream);
+    if (stream) {
+      for (const codec of ["h264", "h265", "h266", "av1"]) {
+        const entries = stream[codec];
+        if (!Array.isArray(entries) || !entries.length) continue;
+        const videoUrl = asRecord(entries[0])?.masterUrl;
+        if (typeof videoUrl === "string" && videoUrl) {
+          downloads.unshift({
+            url: videoUrl,
+            label: "\u65E0\u6C34\u5370\u89C6\u9891",
+            ext: "mp4",
+            kind: "video",
+            noWatermark: true
+          });
+          break;
+        }
+      }
+    }
     const user = asRecord(note.user);
-    const author = user?.nickname ? String(user.nickname) : user?.nickName ? String(user.nickName) : void 0;
     const noteType = String(note.type ?? "");
-    const mediaType = noteType === "video" || videoUrl ? "video" : noteType === "normal" ? "image" : "article";
-    return {
+    const mediaType = downloads.some((d) => d.kind === "video") ? "video" : downloads.length > 1 ? "carousel" : noteType === "normal" ? "image" : "article";
+    return buildResult({
       url,
       resolvedUrl: finalUrl,
-      title: title2,
-      description: description2,
-      imageUrl,
-      videoUrl,
-      siteName: "\u5C0F\u7EA2\u4E66",
       platform: "xiaohongshu",
-      author,
-      mediaType
-    };
+      title: String(note.title ?? note.desc ?? "\u5C0F\u7EA2\u4E66\u4F5C\u54C1").trim(),
+      description: String(note.desc ?? "").trim(),
+      author: user?.nickname ? String(user.nickname) : user?.nickName ? String(user.nickName) : void 0,
+      coverUrl: downloads.find((d) => d.kind === "image")?.url,
+      mediaType,
+      siteName: "\u5C0F\u7EA2\u4E66",
+      downloads
+    });
   }
-  const poster = html.match(/id="video_note_poster"[^>]+src="([^"]+)"/i)?.[1];
-  const title = extractTitle(html) ?? extractMeta(html, "twitter:title") ?? "\u5C0F\u7EA2\u4E66\u4F5C\u54C1";
-  const description = extractMeta(html, "og:description") ?? extractMeta(html, "description") ?? extractMeta(html, "twitter:description") ?? "";
-  return {
-    url,
-    resolvedUrl: finalUrl,
-    title,
-    description,
-    imageUrl: poster ?? extractMeta(html, "og:image"),
-    siteName: "\u5C0F\u7EA2\u4E66",
-    platform: "xiaohongshu",
-    mediaType: poster ? "video" : "article"
-  };
+  throw new Error("\u65E0\u6CD5\u89E3\u6790\u5C0F\u7EA2\u4E66\u4F5C\u54C1");
 }
-async function parseDouyin(url) {
+async function extractDouyin(url) {
   const { html, finalUrl } = await fetchHtml(url, MOBILE_USER_AGENT);
-  const title = extractTitle(html) ?? extractMeta(html, "twitter:title");
-  const description = extractMeta(html, "og:description") ?? extractMeta(html, "description") ?? extractMeta(html, "twitter:description") ?? "";
-  const imageUrl = extractMeta(html, "og:image") ?? extractMeta(html, "twitter:image");
-  const renderDataMatch = html.match(/<script id="RENDER_DATA" type="application\/json">([^<]+)<\/script>/i);
-  if (renderDataMatch?.[1]) {
+  const data = extractJsonScript(html, "RENDER_DATA");
+  const downloads = [];
+  if (data) {
+    const detail = asRecord(deepGet(data, ["app", "videoDetail"])) ?? asRecord(findAwemeDetail(data));
+    if (detail) {
+      const video = asRecord(detail.video);
+      const downloadUrl = firstUrl(video?.download_addr) ?? firstUrl(video?.downloadAddr) ?? firstUrl(asRecord(video?.downloadAddr)?.url_list) ?? firstUrl(asRecord(video?.download_addr)?.url_list);
+      const playUrl = firstUrl(video?.play_addr) ?? firstUrl(video?.playAddr) ?? firstUrl(asRecord(video?.playAddr)?.url_list);
+      if (downloadUrl) {
+        downloads.push({
+          url: downloadUrl,
+          label: "\u65E0\u6C34\u5370\u89C6\u9891",
+          ext: "mp4",
+          kind: "video",
+          noWatermark: true
+        });
+      } else if (playUrl) {
+        downloads.push({ url: playUrl, label: "\u89C6\u9891", ext: "mp4", kind: "video" });
+      }
+      const author = asRecord(detail.author);
+      return buildResult({
+        url,
+        resolvedUrl: finalUrl,
+        platform: "douyin",
+        title: String(detail.desc ?? detail.title ?? "\u6296\u97F3\u4F5C\u54C1"),
+        description: String(detail.desc ?? ""),
+        author: typeof author?.nickname === "string" ? author.nickname : void 0,
+        coverUrl: typeof video?.cover === "string" ? video.cover : void 0,
+        mediaType: "video",
+        siteName: "\u6296\u97F3",
+        downloads
+      });
+    }
+  }
+  const cdnUrls = findMediaUrls(html, ["douyin", "douyinvod", "bytecdn", "snssdk"]);
+  if (cdnUrls.length) {
+    downloads.push({
+      url: cdnUrls[0],
+      label: "\u65E0\u6C34\u5370\u89C6\u9891",
+      ext: "mp4",
+      kind: "video",
+      noWatermark: true
+    });
+  }
+  if (downloads.length) {
+    return buildResult({
+      url,
+      resolvedUrl: finalUrl,
+      platform: "douyin",
+      title: extractTitle(html) ?? "\u6296\u97F3\u4F5C\u54C1",
+      mediaType: "video",
+      siteName: "\u6296\u97F3",
+      downloads
+    });
+  }
+  throw new Error("\u65E0\u6CD5\u89E3\u6790\u6296\u97F3\u94FE\u63A5");
+}
+function findAwemeDetail(obj) {
+  if (!obj || typeof obj !== "object") return void 0;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const found = findAwemeDetail(item);
+      if (found) return found;
+    }
+    return void 0;
+  }
+  const rec = obj;
+  if (rec.aweme_detail || rec.awemeDetail) return rec.aweme_detail ?? rec.awemeDetail;
+  for (const value of Object.values(rec)) {
+    const found = findAwemeDetail(value);
+    if (found) return found;
+  }
+  return void 0;
+}
+async function extractYoutube(url) {
+  const videoId = url.match(/[?&]v=([^&]+)/)?.[1] ?? url.match(/youtu\.be\/([^?&]+)/)?.[1] ?? url.match(/shorts\/([^?&]+)/)?.[1];
+  if (!videoId) throw new Error("\u65E0\u6CD5\u8BC6\u522B YouTube \u89C6\u9891 ID");
+  const body = {
+    context: { client: { clientName: "ANDROID", clientVersion: "20.10.38" } },
+    videoId
+  };
+  const res = await fetch(
+    "https://www.youtube.com/youtubei/v1/player?key=AIzaSyA8eiZmM1FaDVNAWyXlXo8kbyWpXwUbh1Y",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": MOBILE_USER_AGENT },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15e3)
+    }
+  );
+  if (!res.ok) throw new Error(`YouTube API HTTP ${res.status}`);
+  const data = await res.json();
+  const details = asRecord(data.videoDetails);
+  const streaming = asRecord(data.streamingData);
+  const downloads = [];
+  for (const bucket of ["formats", "adaptiveFormats"]) {
+    const list = streaming?.[bucket];
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      const fmt = asRecord(item);
+      const mediaUrl = fmt?.url;
+      const mime = String(fmt?.mimeType ?? "");
+      if (typeof mediaUrl !== "string" || !mediaUrl.startsWith("http")) continue;
+      if (mime.includes("video")) {
+        downloads.push({
+          url: mediaUrl,
+          label: `\u89C6\u9891 ${fmt?.qualityLabel ?? ""}`.trim() || "\u89C6\u9891",
+          ext: "mp4",
+          kind: "video",
+          noWatermark: true
+        });
+      } else if (mime.includes("audio")) {
+        downloads.push({
+          url: mediaUrl,
+          label: "\u97F3\u9891",
+          ext: "m4a",
+          kind: "audio"
+        });
+      }
+    }
+  }
+  const bestVideo = downloads.find((d) => d.kind === "video");
+  const unique = downloads.filter(
+    (item, index, arr) => arr.findIndex((x) => x.url === item.url) === index
+  );
+  return buildResult({
+    url,
+    resolvedUrl: `https://www.youtube.com/watch?v=${videoId}`,
+    platform: "youtube",
+    title: String(details?.title ?? "YouTube \u89C6\u9891"),
+    author: String(asRecord(details?.author)?.name ?? ""),
+    description: String(details?.shortDescription ?? ""),
+    coverUrl: typeof details?.thumbnail === "object" ? firstUrl(details?.thumbnail) : void 0,
+    durationSec: Number(details?.lengthSeconds ?? 0) || void 0,
+    mediaType: bestVideo ? "video" : "article",
+    siteName: "YouTube",
+    downloads: unique.slice(0, 6)
+  });
+}
+async function extractTiktok(url) {
+  const { html, finalUrl } = await fetchHtml(url, MOBILE_USER_AGENT);
+  const downloads = [];
+  const universal = html.match(
+    new RegExp(
+      '<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">([^<]+)</script>'
+    )
+  );
+  if (universal?.[1]) {
     try {
-      const decoded = decodeURIComponent(renderDataMatch[1]);
-      const data = JSON.parse(decoded);
-      const detail = asRecord(deepGet(data, ["app", "videoDetail"]));
-      if (detail) {
-        const video = asRecord(detail.video);
-        const playAddr = asRecord(video?.playAddr);
-        const urlList = playAddr?.url_list;
-        const videoUrl = Array.isArray(urlList) && typeof urlList[0] === "string" ? urlList[0] : void 0;
-        const author = asRecord(detail.author);
-        return {
+      const data = JSON.parse(universal[1]);
+      const urls = findMediaUrls(data, ["tiktokcdn", "tiktokv.com", "muscdn"]);
+      for (const mediaUrl of urls.slice(0, 3)) {
+        downloads.push({
+          url: mediaUrl,
+          label: downloads.length ? `\u89C6\u9891 ${downloads.length + 1}` : "\u65E0\u6C34\u5370\u89C6\u9891",
+          ext: mediaUrl.includes(".m3u8") ? "m3u8" : "mp4",
+          kind: "video",
+          noWatermark: true
+        });
+      }
+      const item = asRecord(deepGet(data, ["__DEFAULT_SCOPE__", "webapp.video-detail", "itemInfo", "itemStruct"]));
+      if (item) {
+        const author = asRecord(item.author);
+        return buildResult({
           url,
           resolvedUrl: finalUrl,
-          title: String(detail.desc ?? detail.title ?? title ?? "\u6296\u97F3\u4F5C\u54C1"),
-          description: String(detail.desc ?? description),
-          imageUrl: typeof video?.cover === "string" ? video.cover : imageUrl,
-          videoUrl,
-          siteName: "\u6296\u97F3",
-          platform: "douyin",
+          platform: "tiktok",
+          title: String(item.desc ?? "TikTok \u89C6\u9891"),
           author: typeof author?.nickname === "string" ? author.nickname : void 0,
-          mediaType: "video"
-        };
+          coverUrl: String(asRecord(item.video)?.cover ?? ""),
+          mediaType: "video",
+          siteName: "TikTok",
+          downloads
+        });
       }
     } catch {
     }
   }
-  if (title || imageUrl) {
-    return {
+  const pageUrls = findMediaUrls(html, ["tiktokcdn", "tiktokv.com", "muscdn"]);
+  for (const mediaUrl of pageUrls.slice(0, 2)) {
+    downloads.push({
+      url: mediaUrl,
+      label: "\u65E0\u6C34\u5370\u89C6\u9891",
+      ext: "mp4",
+      kind: "video",
+      noWatermark: true
+    });
+  }
+  if (downloads.length) {
+    return buildResult({
       url,
       resolvedUrl: finalUrl,
-      title: title ?? "\u6296\u97F3\u4F5C\u54C1",
-      description,
-      imageUrl,
-      siteName: "\u6296\u97F3",
-      platform: "douyin",
-      mediaType: imageUrl ? "video" : "article"
-    };
+      platform: "tiktok",
+      title: extractTitle(html) ?? "TikTok \u89C6\u9891",
+      mediaType: "video",
+      siteName: "TikTok",
+      downloads
+    });
   }
-  throw new Error("\u65E0\u6CD5\u89E3\u6790\u6296\u97F3\u94FE\u63A5");
+  throw new Error("\u65E0\u6CD5\u89E3\u6790 TikTok \u94FE\u63A5\uFF0C\u8BF7\u786E\u8BA4\u94FE\u63A5\u516C\u5F00\u53EF\u8BBF\u95EE");
 }
-async function parseGeneric(url, platform) {
+async function extractInstagram(url) {
+  const { html, finalUrl } = await fetchHtml(url, MOBILE_USER_AGENT);
+  const downloads = [];
+  const title = extractTitle(html) ?? "Instagram \u4F5C\u54C1";
+  const coverUrl = extractMeta(html, "og:image");
+  const videoSecure = extractMeta(html, "og:video:secure_url") ?? extractMeta(html, "og:video");
+  if (videoSecure) {
+    downloads.push({
+      url: videoSecure,
+      label: "\u65E0\u6C34\u5370\u89C6\u9891",
+      ext: "mp4",
+      kind: "video",
+      noWatermark: true
+    });
+  }
+  const embeddedUrls = findMediaUrls(html, ["cdninstagram.com", "fbcdn.net"]);
+  for (const mediaUrl of embeddedUrls.slice(0, 8)) {
+    const kind = /\.mp4|\/o1\/v\//i.test(mediaUrl) ? "video" : "image";
+    if (kind === "video" && !downloads.some((d) => d.kind === "video")) {
+      downloads.push({
+        url: mediaUrl,
+        label: "\u65E0\u6C34\u5370\u89C6\u9891",
+        ext: "mp4",
+        kind: "video",
+        noWatermark: true
+      });
+    } else if (kind === "image") {
+      downloads.push({
+        url: mediaUrl,
+        label: `\u56FE\u7247 ${downloads.filter((d) => d.kind === "image").length + 1}`,
+        ext: "jpg",
+        kind: "image",
+        noWatermark: true
+      });
+    }
+  }
+  if (coverUrl && !downloads.some((d) => d.url === coverUrl)) {
+    downloads.push({ url: coverUrl, label: "\u5C01\u9762", ext: "jpg", kind: "image" });
+  }
+  if (!downloads.length) throw new Error("\u65E0\u6CD5\u89E3\u6790 Instagram \u94FE\u63A5\uFF0C\u53EF\u80FD\u9700\u8981\u767B\u5F55\u6216\u94FE\u63A5\u975E\u516C\u5F00");
+  const mediaType = downloads.some((d) => d.kind === "video") ? "video" : downloads.length > 1 ? "carousel" : "image";
+  return buildResult({
+    url,
+    resolvedUrl: finalUrl,
+    platform: "instagram",
+    title,
+    coverUrl,
+    mediaType,
+    siteName: "Instagram",
+    downloads: dedupeDownloads(downloads).slice(0, 12)
+  });
+}
+async function extractGeneric(url, platform) {
   const { html, finalUrl } = await fetchHtml(url);
-  const title = extractTitle(html) ?? extractMeta(html, "twitter:title") ?? "\u672A\u547D\u540D\u9875\u9762";
-  const description = extractMeta(html, "og:description") ?? extractMeta(html, "description") ?? extractMeta(html, "twitter:description") ?? "";
-  const imageUrl = extractMeta(html, "og:image") ?? extractMeta(html, "twitter:image");
-  const siteName = extractMeta(html, "og:site_name");
-  return { url, resolvedUrl: finalUrl, title, description, imageUrl, siteName, platform, mediaType: "article" };
+  const downloads = [];
+  const video = extractMeta(html, "og:video:secure_url") ?? extractMeta(html, "og:video") ?? extractMeta(html, "twitter:player:stream");
+  const image = extractMeta(html, "og:image");
+  if (video) {
+    downloads.push({ url: video, label: "\u89C6\u9891", ext: "mp4", kind: "video" });
+  }
+  if (image) {
+    downloads.push({ url: image, label: "\u5C01\u9762", ext: "jpg", kind: "image" });
+  }
+  return buildResult({
+    url,
+    resolvedUrl: finalUrl,
+    platform,
+    title: extractTitle(html) ?? "\u672A\u547D\u540D\u9875\u9762",
+    description: extractMeta(html, "og:description") ?? extractMeta(html, "description") ?? extractMeta(html, "twitter:description") ?? "",
+    coverUrl: image,
+    mediaType: video ? "video" : image ? "image" : "article",
+    siteName: extractMeta(html, "og:site_name"),
+    downloads
+  });
 }
-function fallbackUrlParse(url, platform, message) {
-  let title = url;
+function dedupeDownloads(items) {
+  const seen = /* @__PURE__ */ new Set();
+  return items.filter((item) => {
+    if (seen.has(item.url)) return false;
+    seen.add(item.url);
+    return true;
+  });
+}
+async function extractViaWorker(url) {
+  const worker = process.env.MEDIA_EXTRACT_API?.trim();
+  if (!worker) return null;
   try {
-    const u = new URL(url);
-    title = u.hostname + u.pathname.slice(0, 40);
+    const res = await fetch(worker, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(2e4)
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.downloads?.length) return data;
   } catch {
   }
-  return {
-    url,
-    title,
-    description: message ?? "\u65E0\u6CD5\u6293\u53D6\u9875\u9762\u8BE6\u60C5\uFF0C\u5DF2\u4FDD\u5B58\u94FE\u63A5\u4F9B\u540E\u7EED\u5206\u6790",
-    platform,
-    mediaType: "article"
-  };
+  return null;
 }
-async function parseWebUrl(input) {
+function pickPrimaryVideo(result) {
+  return result.downloads.find((d) => d.kind === "video" && d.noWatermark) ?? result.downloads.find((d) => d.kind === "video");
+}
+function pickPrimaryAudio(result) {
+  return result.downloads.find((d) => d.kind === "audio");
+}
+async function extractMedia(input) {
   const url = extractUrlFromText(input);
-  const platform = detectPlatform(url);
+  const platform = detectMediaPlatform(url);
+  const workerResult = await extractViaWorker(url);
+  if (workerResult) return workerResult;
   try {
-    if (platform === "bilibili") return await parseBilibili(url);
-    if (platform === "xiaohongshu") return await parseXiaohongshu(url);
-    if (platform === "douyin") return await parseDouyin(url);
-    return await parseGeneric(url, platform);
-  } catch (err) {
-    if (platform === "bilibili" || platform === "xiaohongshu" || platform === "douyin") {
-      try {
-        return await parseGeneric(url, platform);
-      } catch {
-        return fallbackUrlParse(url, platform, err instanceof Error ? err.message : void 0);
-      }
+    switch (platform) {
+      case "bilibili":
+        return await extractBilibili(url);
+      case "xiaohongshu":
+        return await extractXiaohongshu(url);
+      case "douyin":
+      case "kuaishou":
+        return await extractDouyin(url);
+      case "tiktok":
+        return await extractTiktok(url);
+      case "youtube":
+        return await extractYoutube(url);
+      case "instagram":
+        return await extractInstagram(url);
+      default:
+        return await extractGeneric(url, platform);
     }
-    return fallbackUrlParse(url, platform);
+  } catch (primaryErr) {
+    try {
+      const generic = await extractGeneric(url, platform);
+      if (generic.downloads.length) return generic;
+    } catch {
+    }
+    throw primaryErr instanceof Error ? primaryErr : new Error("\u89E3\u6790\u5931\u8D25");
   }
 }
 
 // shared/src/library/parseTitle.ts
+function decodeHtmlEntities2(text) {
+  return text.replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16))).replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec))).replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+}
 function splitQuery(query) {
   const q = query.trim();
   if (!q) return { title: "", artist: "" };
@@ -2499,12 +2835,54 @@ function countKeywordMatches(item, keywords) {
   }
   return count;
 }
+function cleanRawTitle(raw2) {
+  return decodeHtmlEntities2(raw2).replace(/<[^>]+>/g, "").replace(/【[^】]*】/g, "").replace(/\[[^\]]*\]/g, "").replace(/^[^|｜]*[|｜]\s*/, "").replace(/\s+/g, " ").trim();
+}
 function cleanSongTitle(title) {
   return title.replace(/^[\s《》「」"']+|[\s《》「」"']+$/g, "").replace(/^\d{4,}\s*/, "").replace(/\s*[\-—–|·]\s*[\u4e00-\u9fff]{6,}.*$/, "").replace(/\s*\([^)]*$/, "").replace(/\s*（[^）]*$/, "").replace(/\s*(live|Live|LIVE|现场|版|cover|Cover).*$/, "").trim();
 }
 function cleanArtist(artist) {
   const a = artist.replace(/^[\s《》「」"'@]+|[\s《》「」"'@]+$/g, "").split(/[,、/|]/)[0].trim();
   return a || "\u672A\u77E5\u6B4C\u624B";
+}
+function parseSongFromText(raw2, queryHint) {
+  const cleaned = cleanRawTitle(raw2);
+  const book = cleaned.match(/《([^》]+)》/);
+  if (book) {
+    const title = cleanSongTitle(book[1]);
+    const tail = cleaned.replace(book[0], "").replace(/^[\s\-—–·|：:]+/, "");
+    const artist = tail ? cleanArtist(tail.split(/[\-—–|·]/)[0]) : queryHint?.artist || "\u672A\u77E5\u6B4C\u624B";
+    return { title, artist: artist || queryHint?.artist || "\u672A\u77E5\u6B4C\u624B" };
+  }
+  const dash = cleaned.match(/^(.+?)\s*[\-—–]\s*(.+)$/);
+  if (dash) {
+    const left = dash[1].trim();
+    const right = dash[2].trim();
+    if (/^\d{6,8}\s/.test(left) && queryHint?.title) {
+      return { title: cleanSongTitle(queryHint.title), artist: cleanArtist(right) };
+    }
+    if (queryHint?.artist && (left.includes(queryHint.artist) || right.includes(queryHint.artist))) {
+      return {
+        title: cleanSongTitle(queryHint.title || left.replace(/^\d{4,}\s*/, "")),
+        artist: cleanArtist(queryHint.artist)
+      };
+    }
+    if (queryHint?.title && (left.toLowerCase().includes(queryHint.title.toLowerCase()) || right.toLowerCase().includes(queryHint.title.toLowerCase()))) {
+      return {
+        title: cleanSongTitle(queryHint.title),
+        artist: queryHint.artist ? cleanArtist(queryHint.artist) : cleanArtist(right)
+      };
+    }
+    return { title: cleanSongTitle(left), artist: cleanArtist(right) };
+  }
+  if (queryHint?.title && cleaned.toLowerCase().includes(queryHint.title.toLowerCase())) {
+    const artistPart = queryHint.artist ? cleanArtist(queryHint.artist) : "\u672A\u77E5\u6B4C\u624B";
+    return {
+      title: cleanSongTitle(queryHint.title),
+      artist: artistPart
+    };
+  }
+  return { title: cleanSongTitle(cleaned), artist: queryHint?.artist ? cleanArtist(queryHint.artist) : "\u672A\u77E5\u6B4C\u624B" };
 }
 function normalizeSongTitle(title) {
   return cleanSongTitle(title).toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, "").trim();
@@ -2522,8 +2900,17 @@ function isRemixOrLive(title) {
 
 // shared/src/library/search.ts
 async function fetchJson2(url, referer) {
-  const headers = { "User-Agent": USER_AGENT };
-  if (referer) headers.Referer = referer;
+  const headers = {
+    "User-Agent": USER_AGENT,
+    Accept: "application/json, text/plain, */*",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+  };
+  if (referer) {
+    headers.Referer = referer;
+    if (referer.startsWith("https://search.bilibili.com")) {
+      headers.Origin = "https://search.bilibili.com";
+    }
+  }
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(url, { headers });
     if (res.status === 412 && attempt === 0) {
@@ -2542,13 +2929,16 @@ function scoreCandidate(query, item, keywords) {
   const title = normalizeSongTitle(item.title);
   const artist = item.artist.toLowerCase().replace(/\s/g, "");
   const titleHit = !!(qt && (title === qt || title.includes(qt) || qt.includes(title)));
+  const artistTokenTitleHit = !!(qa && title.includes(qa));
   const artistHit = !!(qa && artist.includes(qa));
   if (titleHit && artistHit) score += 300;
   else if (titleHit) score += 80;
+  else if (artistTokenTitleHit) score += 80;
   else if (artistHit) score += 80;
-  if (qa && !artistHit) score -= 120;
+  if (qa && !artistHit && !artistTokenTitleHit) score -= 120;
   if (item.album) score += 20;
   if (item.previewUrl) score += 10;
+  if (item.playBvid) score += 5;
   if (item.album && !/live|现场/i.test(item.album)) score += 15;
   if (isRemixOrLive(item.title) && !/live|版|dj|remix/i.test(query.title + query.artist)) score -= 60;
   if (item.album && /live|现场/i.test(item.album) && !/live|现场/i.test(query.title + query.artist)) {
@@ -2563,7 +2953,9 @@ function isRelevantResult(item, query) {
   const hintArtist = query.artist.toLowerCase().replace(/\s/g, "");
   if (!hintTitle && hintArtist) {
     const artist = item.artist.toLowerCase().replace(/\s/g, "");
-    return artist.includes(hintArtist);
+    const title = normalizeSongTitle(item.title);
+    const album = normalizeSongTitle(item.album ?? "");
+    return artist.includes(hintArtist) || title.includes(hintArtist) || album.includes(hintArtist);
   }
   if (!hintTitle) return true;
   const itemTitle = normalizeSongTitle(item.title);
@@ -2582,7 +2974,7 @@ function mergeResult(base, other) {
     ...base,
     album: base.album || other.album,
     coverUrl: base.coverUrl || other.coverUrl,
-    previewUrl: base.previewUrl || other.previewUrl,
+    previewUrl: base.previewUrl || (base.source === other.source ? other.previewUrl : void 0),
     durationMs: base.durationMs || other.durationMs
   };
 }
@@ -2617,6 +3009,59 @@ async function searchItunes(query, limit, _hint) {
   }
   return results;
 }
+function normalizeImageUrl(raw2) {
+  const url = raw2 ? String(raw2).trim() : "";
+  if (!url) return void 0;
+  if (url.startsWith("//")) return `https:${url}`;
+  return url;
+}
+function parseBilibiliDuration(raw2) {
+  if (typeof raw2 === "number") return raw2 * 1e3;
+  const value = raw2 ? String(raw2).trim() : "";
+  if (!value) return 0;
+  const parts = value.split(":").map((part) => Number(part));
+  if (parts.some((part) => Number.isNaN(part))) return 0;
+  return parts.reduce((total, part) => total * 60 + part, 0) * 1e3;
+}
+async function searchBilibili(query, limit, hint) {
+  const pageSize = Math.max(limit, 20);
+  const params = new URLSearchParams({
+    search_type: "video",
+    keyword: query,
+    page_size: String(pageSize),
+    page: "1",
+    order: "totalrank",
+    duration: "0",
+    tids: "0"
+  });
+  const url = `https://api.bilibili.com/x/web-interface/search/type?${params.toString()}`;
+  const data = await fetchJson2(
+    url,
+    "https://search.bilibili.com/"
+  );
+  const results = [];
+  for (const item of data.data?.result ?? []) {
+    const bvid = String(item.bvid ?? "").trim();
+    if (!bvid) continue;
+    const rawTitle = String(item.title ?? "").trim();
+    const parsed = parseSongFromText(rawTitle, hint);
+    const title = cleanSongTitle(parsed.title || rawTitle);
+    if (!title) continue;
+    const author = cleanArtist(String(item.author ?? ""));
+    const artist = parsed.artist && parsed.artist !== "\u672A\u77E5\u6B4C\u624B" ? cleanArtist(parsed.artist) : hint.artist ? cleanArtist(hint.artist) : author;
+    results.push({
+      id: `bilibili:${bvid}`,
+      title,
+      artist,
+      album: rawTitle.replace(/<[^>]+>/g, "") || "Bilibili",
+      durationMs: parseBilibiliDuration(item.duration),
+      coverUrl: normalizeImageUrl(item.pic),
+      source: "bilibili",
+      playBvid: bvid
+    });
+  }
+  return results;
+}
 function dedupeOnePerSong(items, query, keywords) {
   const best = /* @__PURE__ */ new Map();
   for (const item of items) {
@@ -2642,62 +3087,37 @@ async function searchMusicOnline(query, limit = 20) {
   const hint = splitQuery(q);
   const keywords = extractQueryKeywords(q, hint);
   const searchTerm = hint.artist && hint.title ? `${hint.artist} ${hint.title}`.trim() : hint.artist || hint.title || q;
-  const [broad, focused] = await Promise.all([
+  const [broad, focused, bilibiliBroad, bilibiliFocused] = await Promise.all([
     searchItunes(q, limit * 3, hint).catch(() => []),
-    searchTerm !== q ? searchItunes(searchTerm, limit * 3, hint).catch(() => []) : Promise.resolve([])
+    searchTerm !== q ? searchItunes(searchTerm, limit * 3, hint).catch(() => []) : Promise.resolve([]),
+    searchBilibili(q, limit * 3, hint).catch(() => []),
+    searchTerm !== q ? searchBilibili(searchTerm, limit * 3, hint).catch(() => []) : Promise.resolve([])
   ]);
-  const itunes = [...focused, ...broad];
-  const merged = dedupeOnePerSong(itunes, hint, keywords);
+  const candidates = [...focused, ...broad, ...bilibiliFocused, ...bilibiliBroad];
+  const merged = dedupeOnePerSong(candidates, hint, keywords);
   const relevant = merged.filter((item) => isRelevantResult(item, hint));
   const picked = (relevant.length ? relevant : merged).slice(0, limit);
   if (!picked.length) throw new Error("\u672A\u627E\u5230\u76F8\u5173\u6B4C\u66F2\uFF0C\u8BF7\u6362\u5173\u952E\u8BCD\u6216\u4E0A\u4F20\u672C\u5730\u6587\u4EF6");
   return picked;
 }
-function detectPlatform2(url) {
-  const lower = url.toLowerCase();
-  if (lower.includes("bilibili.com") || lower.includes("b23.tv")) return "bilibili";
-  if (lower.includes("douyin.com") || lower.includes("iesdouyin.com")) return "douyin";
-  if (lower.includes("xiaohongshu.com") || lower.includes("xhslink.com")) return "xiaohongshu";
-  return null;
+function detectPlatform(url) {
+  const platform = detectMediaPlatform(url);
+  return platform === "unknown" ? null : platform;
 }
-function extractBvid2(url) {
-  const match2 = url.match(/BV[a-zA-Z0-9]+/);
-  return match2 ? match2[0] : null;
-}
-async function parseBilibili2(url) {
-  const bvid = extractBvid2(url);
-  if (!bvid) throw new Error("\u65E0\u6CD5\u8BC6\u522B Bilibili \u89C6\u9891\u94FE\u63A5");
-  const info = await fetchJson2(
-    `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
-    "https://www.bilibili.com"
-  );
-  if (info.code !== 0) throw new Error(info.message ?? "Bilibili API \u9519\u8BEF");
-  const data = info.data;
-  const cid = Number(data.cid);
-  const play = await fetchJson2(
-    `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${cid}&fnval=16&qn=0`,
-    "https://www.bilibili.com"
-  );
-  const audio = play.data?.dash?.audio?.[0];
+function toLinkParseResult(result) {
+  const video = pickPrimaryVideo(result);
+  const audio = pickPrimaryAudio(result);
   return {
-    platform: "bilibili",
-    title: String(data.title ?? "Bilibili \u89C6\u9891"),
-    author: String(data.owner?.name ?? ""),
-    durationSec: Number(data.duration ?? 0),
-    coverUrl: data.pic ? String(data.pic) : void 0,
-    audioUrl: audio?.baseUrl ?? audio?.base_url,
-    originalUrl: url
-  };
-}
-function toLinkParseResult(parsed, originalUrl) {
-  return {
-    platform: parsed.platform,
-    title: parsed.title,
-    author: parsed.author ?? "",
-    durationSec: parsed.durationSec ?? 0,
-    coverUrl: parsed.imageUrl,
-    audioUrl: parsed.videoUrl,
-    originalUrl: parsed.resolvedUrl ?? originalUrl
+    platform: result.platform,
+    title: result.title,
+    author: result.author ?? "",
+    durationSec: result.durationSec ?? 0,
+    coverUrl: result.coverUrl ?? result.downloads.find((d) => d.kind === "image")?.url,
+    videoUrl: video?.url,
+    audioUrl: audio?.url ?? video?.url,
+    originalUrl: result.resolvedUrl ?? result.url,
+    mediaType: result.mediaType,
+    downloads: result.downloads
   };
 }
 async function parseMediaUrl(url) {
@@ -2706,37 +3126,57 @@ async function parseMediaUrl(url) {
   if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
     throw new Error("\u8BF7\u8F93\u5165\u6709\u6548\u7684 http/https \u94FE\u63A5");
   }
-  const platform = detectPlatform2(trimmed);
-  if (platform === "bilibili") {
-    try {
-      return await parseBilibili2(trimmed);
-    } catch {
-      try {
-        return toLinkParseResult(await parseWebUrl(trimmed), trimmed);
-      } catch {
-        return {
-          platform: "bilibili",
-          title: "Bilibili \u89C6\u9891",
-          author: "",
-          durationSec: 0,
-          originalUrl: trimmed
-        };
-      }
-    }
-  }
-  if (platform === "douyin" || platform === "xiaohongshu") {
-    return toLinkParseResult(await parseWebUrl(trimmed), trimmed);
-  }
-  throw new Error("\u6682\u4E0D\u652F\u6301\u8BE5\u5E73\u53F0\uFF0C\u76EE\u524D\u652F\u6301: Bilibili\u3001\u6296\u97F3\u3001\u5C0F\u7EA2\u4E66");
+  const platform = detectPlatform(trimmed);
+  if (!platform) throw new Error("\u6682\u4E0D\u652F\u6301\u8BE5\u5E73\u53F0");
+  return toLinkParseResult(await extractMedia(trimmed));
 }
 
 // shared/src/library/resolve.ts
+var BILI_REFERER = "https://www.bilibili.com";
+async function fetchJson3(url, referer) {
+  const headers = { "User-Agent": USER_AGENT };
+  if (referer) headers.Referer = referer;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(url, { headers });
+    if (res.status === 412 && attempt === 0) {
+      await new Promise((r) => setTimeout(r, 400));
+      continue;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+  throw new Error("HTTP 412");
+}
+async function getBilibiliAudioUrl(bvid) {
+  const info = await fetchJson3(
+    `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
+    BILI_REFERER
+  );
+  if (info.code !== 0 || !info.data?.cid) return null;
+  const play = await fetchJson3(
+    `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${info.data.cid}&fnval=16&qn=0`,
+    BILI_REFERER
+  );
+  const audio = play.data?.dash?.audio?.[0];
+  return audio?.baseUrl ?? audio?.base_url ?? null;
+}
 async function resolveMusicAudioUrl(result) {
   if (result.previewUrl) {
     return {
       url: result.previewUrl,
       ext: result.previewUrl.includes(".m4a") ? "m4a" : "mp3"
     };
+  }
+  const bvid = result.playBvid ?? (result.id.startsWith("bilibili:") ? result.id.slice("bilibili:".length) : "");
+  if (result.source === "bilibili" && bvid) {
+    const url = await getBilibiliAudioUrl(bvid);
+    if (url) {
+      return {
+        url,
+        referer: BILI_REFERER,
+        ext: url.includes(".mp3") ? "mp3" : "m4a"
+      };
+    }
   }
   throw new Error("\u6682\u65F6\u65E0\u6CD5\u89E3\u6790\u8BE5\u6B4C\u66F2\uFF0C\u8BF7\u6362\u4E00\u6761\u7ED3\u679C\u6216\u4E0A\u4F20\u672C\u5730\u6587\u4EF6");
 }
@@ -2750,10 +3190,29 @@ var CN_QUERY_MAP = {
   \u70B9\u51FB: "ui click button",
   \u6309\u94AE: "button click ui",
   \u96E8: "rain ambience",
+  \u4E0B\u96E8: "rain ambience",
   \u96F7\u58F0: "thunder",
+  \u6253\u96F7: "thunder storm",
   \u811A\u6B65: "footsteps walking",
+  \u8D70\u8DEF: "footsteps walking",
   \u5F00\u95E8: "door open creak",
+  \u5173\u95E8: "door close slam",
   \u7206\u70B8: "explosion impact",
+  \u9E1F\u53EB: "bird chirp nature",
+  \u9E1F\u9E23: "bird chirp nature",
+  \u6D77\u6D6A: "ocean waves sea",
+  \u98CE\u58F0: "wind ambience",
+  \u706B\u7130: "fire crackle",
+  \u71C3\u70E7: "fire crackle",
+  \u4EBA\u7FA4: "crowd ambience",
+  \u6C7D\u8F66: "car engine vehicle",
+  \u5239\u8F66: "car brake skid",
+  \u952E\u76D8: "keyboard typing",
+  \u73BB\u7483: "glass break",
+  \u91D1\u5C5E: "metal hit clang",
+  \u6C34\u6EF4: "water drop",
+  \u72D7\u53EB: "dog bark",
+  \u732B\u53EB: "cat meow",
   _whoosh: "whoosh swoosh"
 };
 var CURATED_SFX = [
@@ -2788,6 +3247,10 @@ var CURATED_SFX = [
     source: "mixkit"
   }
 ];
+var SEARCH_TIMEOUT_MS = 1e4;
+var OPENVERSE_API = "https://api.openverse.org/v1/audio/";
+var ARCHIVE_SEARCH_API = "https://archive.org/advancedsearch.php";
+var ARCHIVE_METADATA_API = "https://archive.org/metadata";
 function expandQuery(query) {
   const q = query.trim();
   if (!q) return "";
@@ -2810,6 +3273,133 @@ function scoreSfx(query, item) {
   }
   return score;
 }
+function sourcePriority(source) {
+  if (source.startsWith("openverse")) return 300;
+  if (source.startsWith("archive")) return 250;
+  if (source.startsWith("wikimedia")) return 200;
+  return 50;
+}
+function combinedScore(query, item) {
+  return Math.max(scoreSfx(query, item), scoreSfx(expandQuery(query), item)) + sourcePriority(item.source);
+}
+function cleanTitle(title, fallback = "Sound effect") {
+  return (title ?? fallback).replace(/^File:/, "").replace(/\.[a-z0-9]{2,5}$/i, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+function isHttpUrl(url) {
+  return !!url && /^https?:\/\//i.test(url);
+}
+function inferFileType(url, explicit) {
+  const fileType = explicit?.toLowerCase().replace(/^\./, "");
+  if (fileType && /^[a-z0-9]+$/.test(fileType)) return fileType;
+  const path8 = url.split("?")[0].split("#")[0];
+  const match2 = path8.match(/\.([a-z0-9]{2,5})$/i);
+  return match2?.[1]?.toLowerCase();
+}
+function toDurationMs(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value > 1e4 ? Math.round(value) : Math.round(value * 1e3);
+  }
+  if (typeof value !== "string") return void 0;
+  const trimmed = value.trim();
+  if (!trimmed) return void 0;
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric)) return numeric > 1e4 ? Math.round(numeric) : Math.round(numeric * 1e3);
+  const parts = trimmed.split(":").map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return void 0;
+  const seconds = parts.reduce((total, part) => total * 60 + part, 0);
+  return Math.round(seconds * 1e3);
+}
+async function fetchJson4(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": USER_AGENT
+      },
+      signal: controller.signal
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+async function searchOpenverse(query, limit) {
+  const url = `${OPENVERSE_API}?` + new URLSearchParams({
+    q: expandQuery(query),
+    page_size: String(Math.min(Math.max(limit, 1), 50)),
+    mature: "false"
+  });
+  const data = await fetchJson4(url);
+  return (data.results ?? []).filter((item) => isHttpUrl(item.url)).map((item) => {
+    const provider = item.provider || item.source || "audio";
+    const license = item.license ? `CC ${item.license.toUpperCase()}` : void 0;
+    return {
+      id: `openverse:${provider}:${item.id ?? encodeURIComponent(item.url)}`,
+      title: cleanTitle(item.title),
+      previewUrl: item.url,
+      source: `openverse:${provider}`,
+      sourceLabel: `Openverse \xB7 ${provider}`,
+      sourceUrl: item.foreign_landing_url,
+      creator: item.creator,
+      license,
+      fileType: inferFileType(item.url, item.filetype),
+      durationMs: toDurationMs(item.duration)
+    };
+  });
+}
+function archiveSearchQuery(query) {
+  const term = expandQuery(query).replace(/[\\"]/g, " ").trim();
+  if (!term) return "mediatype:audio";
+  return `(title:(${term}) OR description:(${term}) OR subject:(${term})) AND mediatype:audio`;
+}
+function encodeArchivePath(pathname) {
+  return pathname.split("/").map(encodeURIComponent).join("/");
+}
+function pickArchiveAudio(files) {
+  const audioFormats = ["VBR MP3", "MP3", "Ogg Vorbis", "WAVE", "FLAC", "M4A"];
+  return files?.filter((file) => file.name && audioFormats.some((format) => file.format?.toLowerCase().includes(format.toLowerCase()))).sort((a, b) => {
+    const aMp3 = a.name?.toLowerCase().endsWith(".mp3") ? 1 : 0;
+    const bMp3 = b.name?.toLowerCase().endsWith(".mp3") ? 1 : 0;
+    return bMp3 - aMp3;
+  })[0];
+}
+async function searchInternetArchive(query, limit) {
+  const params = new URLSearchParams({
+    q: archiveSearchQuery(query),
+    rows: String(Math.min(Math.max(limit, 1), 8)),
+    output: "json"
+  });
+  for (const field of ["identifier", "title", "creator"]) params.append("fl[]", field);
+  const url = `${ARCHIVE_SEARCH_API}?${params.toString()}`;
+  const data = await fetchJson4(url);
+  const docs = (data.response?.docs ?? []).filter((doc) => doc.identifier);
+  const results = await Promise.all(
+    docs.map(async (doc) => {
+      const identifier = doc.identifier;
+      const metadata = await fetchJson4(`${ARCHIVE_METADATA_API}/${encodeURIComponent(identifier)}`);
+      const file = pickArchiveAudio(metadata.files);
+      if (!file?.name) return null;
+      const previewUrl = `https://archive.org/download/${encodeURIComponent(identifier)}/${encodeArchivePath(file.name)}`;
+      const creator = metadata.metadata?.creator ?? doc.creator;
+      return {
+        id: `archive:${identifier}:${file.name}`,
+        title: cleanTitle(metadata.metadata?.title ?? doc.title ?? file.name),
+        previewUrl,
+        source: "archive",
+        sourceLabel: "Internet Archive",
+        sourceUrl: `https://archive.org/details/${encodeURIComponent(identifier)}`,
+        creator: Array.isArray(creator) ? creator.join(", ") : creator,
+        license: "Archive.org",
+        fileType: inferFileType(previewUrl),
+        durationMs: toDurationMs(file.length)
+      };
+    })
+  );
+  return results.filter((item) => !!item);
+}
 async function searchWikimedia(query, limit) {
   const searchTerm = expandQuery(query);
   const url = "https://commons.wikimedia.org/w/api.php?" + new URLSearchParams({
@@ -2818,25 +3408,27 @@ async function searchWikimedia(query, limit) {
     gsrsearch: `filetype:audio ${searchTerm}`,
     gsrnamespace: "6",
     prop: "imageinfo",
-    iiprop: "url|mime|size",
+    iiprop: "url|mime|size|extmetadata",
     gsrlimit: String(limit),
     format: "json",
     origin: "*"
   });
-  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-  if (!res.ok) return [];
-  const data = await res.json();
+  const data = await fetchJson4(url);
   const results = [];
   for (const page of Object.values(data.query?.pages ?? {})) {
     const info = page.imageinfo?.[0];
     const fileUrl = info?.url;
     if (!fileUrl || !info.mime?.startsWith("audio")) continue;
-    const title = (page.title ?? "Sound").replace(/^File:/, "").replace(/\.[^.]+$/, "");
     results.push({
-      id: `wikimedia:${encodeURIComponent(title)}`,
-      title,
+      id: `wikimedia:${encodeURIComponent(page.title ?? fileUrl)}`,
+      title: cleanTitle(page.title),
       previewUrl: fileUrl,
-      source: "wikimedia"
+      source: "wikimedia",
+      sourceLabel: "Wikimedia Commons",
+      sourceUrl: info.descriptionurl,
+      creator: info.extmetadata?.Artist?.value?.replace(/<[^>]+>/g, ""),
+      license: info.extmetadata?.LicenseShortName?.value?.replace(/<[^>]+>/g, ""),
+      fileType: inferFileType(fileUrl, info.mime.split("/")[1])
     });
   }
   return results;
@@ -2845,13 +3437,18 @@ async function searchSfxOnline(query, limit = 12) {
   const q = query.trim();
   if (!q) throw new Error("\u8BF7\u8F93\u5165\u97F3\u6548\u5173\u952E\u8BCD");
   const curated = CURATED_SFX.filter((item) => scoreSfx(q, item) > 0 || q.length <= 4).sort((a, b) => scoreSfx(q, b) - scoreSfx(q, a));
-  const remote = await searchWikimedia(q, limit).catch(() => []);
-  const merged = [...curated, ...remote];
+  const [openverse, archive, wikimedia] = await Promise.all([
+    searchOpenverse(q, limit).catch(() => []),
+    searchInternetArchive(q, Math.ceil(limit / 2)).catch(() => []),
+    searchWikimedia(q, limit).catch(() => [])
+  ]);
+  const merged = [...openverse, ...archive, ...wikimedia, ...curated];
   const seen = /* @__PURE__ */ new Set();
   const unique = [];
-  for (const item of merged.sort((a, b) => scoreSfx(q, b) - scoreSfx(q, a))) {
-    if (seen.has(item.previewUrl)) continue;
-    seen.add(item.previewUrl);
+  for (const item of merged.sort((a, b) => combinedScore(q, b) - combinedScore(q, a))) {
+    const key = item.previewUrl.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
     unique.push(item);
     if (unique.length >= limit) break;
   }
@@ -2895,6 +3492,46 @@ var DEFAULT_DOCUMENT = {
   ],
   updatedAt: (/* @__PURE__ */ new Date()).toISOString()
 };
+
+// shared/src/knowgo/urlParse.ts
+function toUrlParseResult(result) {
+  const video = pickPrimaryVideo(result);
+  return {
+    url: result.url,
+    resolvedUrl: result.resolvedUrl,
+    title: result.title,
+    description: result.description ?? "",
+    imageUrl: result.coverUrl ?? result.downloads.find((d) => d.kind === "image")?.url,
+    videoUrl: video?.url,
+    siteName: result.siteName,
+    platform: result.platform,
+    author: result.author,
+    durationSec: result.durationSec,
+    mediaType: result.mediaType === "carousel" ? "image" : result.mediaType === "audio" ? "article" : result.mediaType,
+    downloads: result.downloads
+  };
+}
+async function parseWebUrl(input) {
+  try {
+    return toUrlParseResult(await extractMedia(input));
+  } catch (err) {
+    const url = extractUrlFromText(input);
+    const platform = detectMediaPlatform(url);
+    let title = url;
+    try {
+      const u = new URL(url);
+      title = u.hostname + u.pathname.slice(0, 40);
+    } catch {
+    }
+    return {
+      url,
+      title,
+      description: err instanceof Error ? err.message : "\u65E0\u6CD5\u6293\u53D6\u9875\u9762\u8BE6\u60C5\uFF0C\u5DF2\u4FDD\u5B58\u94FE\u63A5\u4F9B\u540E\u7EED\u5206\u6790",
+      platform,
+      mediaType: "article"
+    };
+  }
+}
 
 // shared/src/knowgo/analyzeLocal.ts
 var ART_STYLES = [
@@ -4196,6 +4833,14 @@ app.onError((err, c) => {
   console.error("[api error]", err);
   return c.json({ error: err.message || "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF" }, 500);
 });
+function inferAudioExt(url, fileType) {
+  const explicit = fileType?.toLowerCase().replace(/^\./, "");
+  if (explicit && /^[a-z0-9]+$/.test(explicit)) return explicit;
+  const pathname = url.split("?")[0].split("#")[0];
+  const match2 = pathname.match(/\.([a-z0-9]{2,5})$/i);
+  if (match2?.[1]) return match2[1].toLowerCase();
+  return "mp3";
+}
 app.get(
   "/health",
   (c) => c.json({
@@ -4326,6 +4971,7 @@ app.get("/search/play", async (c) => {
   const artist = c.req.query("artist") ?? "";
   const source = c.req.query("source") ?? "";
   const previewUrl = c.req.query("previewUrl") ?? "";
+  const playBvid = c.req.query("playBvid") ?? "";
   try {
     const resolved = await resolveMusicAudioUrl({
       id: resultId,
@@ -4334,7 +4980,8 @@ app.get("/search/play", async (c) => {
       album: "",
       durationMs: 0,
       source,
-      previewUrl: previewUrl || void 0
+      previewUrl: previewUrl || void 0,
+      playBvid: playBvid || void 0
     });
     const headers = { "User-Agent": "Mozilla/5.0" };
     if (resolved.referer) headers.Referer = resolved.referer;
@@ -4359,23 +5006,16 @@ app.post("/library/import-link", async (c) => {
   const sourceLabel = `link:${link.platform}`;
   const tmp = tempDir();
   try {
-    if (link.platform === "bilibili" && link.audioUrl) {
-      const ext = link.audioUrl.includes(".m4a") ? "m4a" : "mp3";
-      const dest = path2.join(tmp, `bilibili.${ext}`);
-      await downloadHttp(link.audioUrl, dest, "https://www.bilibili.com");
-      return c.json(importFile(dest, link.title, tags, "music", sourceLabel));
-    }
-    if ((link.platform === "xiaohongshu" || link.platform === "douyin") && link.audioUrl?.startsWith("http")) {
-      const ext = link.audioUrl.includes(".mp4") ? "mp4" : "mp3";
+    const mediaUrl = link.downloadUrl ?? link.videoUrl ?? link.audioUrl;
+    if (mediaUrl?.startsWith("http")) {
+      const ext = link.ext ?? (mediaUrl.includes(".mp4") ? "mp4" : mediaUrl.includes(".m4a") ? "m4a" : mediaUrl.includes(".webm") ? "webm" : "mp3");
       const dest = path2.join(tmp, `${link.platform}.${ext}`);
-      await downloadHttp(link.audioUrl, dest);
+      const referer = link.referer ?? (link.platform === "bilibili" ? "https://www.bilibili.com" : link.platform === "douyin" ? "https://www.douyin.com" : void 0);
+      await downloadHttp(mediaUrl, dest, referer);
       return c.json(importFile(dest, link.title, tags, "music", sourceLabel));
     }
     if (process.env.VERCEL) {
-      return c.json(
-        { error: "\u672A\u80FD\u83B7\u53D6\u53EF\u4E0B\u8F7D\u7684\u5A92\u4F53\u5730\u5740\uFF0C\u8BF7\u786E\u8BA4\u94FE\u63A5\u6709\u6548\u6216\u6362\u7528 Bilibili / iTunes \u641C\u7D22" },
-        400
-      );
+      return c.json({ error: "\u672A\u80FD\u83B7\u53D6\u53EF\u4E0B\u8F7D\u7684\u5A92\u4F53\u5730\u5740\uFF0C\u8BF7\u786E\u8BA4\u94FE\u63A5\u6709\u6548" }, 400);
     }
     const downloaded = downloadWithYtDlp(link.originalUrl, tmp);
     return c.json(
@@ -4391,6 +5031,34 @@ app.post("/library/import-link", async (c) => {
     return c.json({ error: String(err) }, 500);
   } finally {
     cleanupTemp();
+  }
+});
+app.get("/media/proxy", async (c) => {
+  const mediaUrl = c.req.query("url");
+  const referer = c.req.query("referer");
+  if (!mediaUrl?.startsWith("http")) return c.json({ error: "\u65E0\u6548 URL" }, 400);
+  try {
+    const headers = {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    };
+    if (referer) headers.Referer = referer;
+    const res = await fetch(mediaUrl, { headers, redirect: "follow" });
+    if (!res.ok) return c.json({ error: `\u4E0B\u8F7D\u5931\u8D25: HTTP ${res.status}` }, 502);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const contentType = res.headers.get("content-type") ?? "application/octet-stream";
+    c.header("Content-Type", contentType);
+    c.header("Cache-Control", "public, max-age=300");
+    return c.body(buffer);
+  } catch (err) {
+    return c.json({ error: String(err) }, 502);
+  }
+});
+app.post("/media/extract", async (c) => {
+  const { url } = await c.req.json();
+  try {
+    return c.json(await extractMedia(url));
+  } catch (err) {
+    return c.json({ error: String(err) }, 400);
   }
 });
 app.delete("/library/sounds/:id", (c) => {
@@ -4420,12 +5088,12 @@ app.get("/search/sfx", async (c) => {
   }
 });
 app.post("/library/import-sfx", async (c) => {
-  const { title, previewUrl, source } = await c.req.json();
+  const { title, previewUrl, source, fileType, referer } = await c.req.json();
   const tmp = tempDir();
   try {
-    const ext = previewUrl.includes(".wav") ? "wav" : "mp3";
+    const ext = inferAudioExt(previewUrl, fileType);
     const dest = path2.join(tmp, `sfx.${ext}`);
-    await downloadHttp(previewUrl, dest);
+    await downloadHttp(previewUrl, dest, referer);
     return c.json(
       importFile(dest, title, ["foley", "sfx", source], "foley", `sfx:${source}`)
     );

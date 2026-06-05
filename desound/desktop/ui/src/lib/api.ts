@@ -77,7 +77,7 @@ export const api = {
   saveFoleySound: (name: string, presetId: string, tags?: string[]): Promise<SoundAsset> =>
     requireDesktop(() => invoke("save_foley_sound", { name, presetId, tags })),
 
-  uploadFoleyFile: async (): Promise<SoundAsset> => {
+  uploadFoleyFile: async (_file?: File): Promise<SoundAsset> => {
     const path = await open({
       multiple: false,
       filters: [{ name: "Audio", extensions: ["wav", "mp3", "flac", "aac", "ogg", "m4a"] }],
@@ -93,6 +93,8 @@ export const api = {
   searchSfxOnline: (q: string, limit = 12): Promise<SfxSearchResult[]> =>
     searchSfxShared(q, limit),
 
+  getSfxPreviewUrl: (result: SfxSearchResult): string => result.previewUrl,
+
   saveSfxResult: (result: SfxSearchResult): Promise<SoundAsset> =>
     requireDesktop(() =>
       invoke("import_from_http_url", {
@@ -100,7 +102,8 @@ export const api = {
         name: result.title,
         tags: ["foley", "sfx", result.source],
         sourceLabel: `sfx:${result.source}`,
-        referer: undefined,
+        referer: result.referer,
+        ext: result.fileType,
       }),
     ),
 

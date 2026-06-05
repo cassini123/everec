@@ -46,7 +46,7 @@ export function BottomToolBar({
           onClick={() => onPanelChange("dubbing")}
           className={`flex items-center gap-1.5 rounded px-3 py-1 text-xs transition ${
             panel === "dubbing"
-              ? "bg-ds-purple/20 text-ds-purple"
+              ? "bg-ds-accent/20 text-ds-accent"
               : "text-ds-muted hover:text-ds-text"
           }`}
         >
@@ -92,7 +92,7 @@ export function BottomToolBar({
                 onChange={(e) => onDubChange({ ...dub, script: e.target.value })}
                 placeholder="输入旁白或对白文本…"
                 rows={3}
-                className="w-full resize-none rounded border border-ds-border bg-ds-bg px-3 py-2 text-sm outline-none focus:border-ds-purple"
+                className="w-full resize-none rounded border border-ds-border bg-ds-bg px-3 py-2 text-sm outline-none focus:border-ds-accent"
               />
             </div>
             <div className="flex w-48 flex-col gap-2">

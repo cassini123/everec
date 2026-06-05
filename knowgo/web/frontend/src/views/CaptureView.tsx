@@ -14,7 +14,15 @@ export function CaptureView({ project, onUpdate }: CaptureViewProps) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const [preview, setPreview] = useState<{ title: string; description: string; imageUrl?: string } | null>(null);
+  const [preview, setPreview] = useState<{
+    title: string;
+    description: string;
+    imageUrl?: string;
+    videoUrl?: string;
+    author?: string;
+    platform?: string;
+    mediaType?: "video" | "image" | "article";
+  } | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,6 +56,10 @@ export function CaptureView({ project, onUpdate }: CaptureViewProps) {
         title: parsed.title,
         description: parsed.description,
         imageUrl: parsed.imageUrl,
+        videoUrl: parsed.videoUrl,
+        author: parsed.author,
+        platform: parsed.platform,
+        mediaType: parsed.mediaType,
       });
     } catch (err) {
       setError(String(err));
@@ -140,15 +152,29 @@ export function CaptureView({ project, onUpdate }: CaptureViewProps) {
             {preview && (
               <div className="mt-4 rounded-lg border border-kg-border bg-kg-panel p-4">
                 <div className="flex gap-4">
-                  {preview.imageUrl && (
+                  {preview.videoUrl ? (
+                    <video
+                      src={preview.videoUrl}
+                      poster={preview.imageUrl}
+                      controls
+                      className="h-28 w-44 shrink-0 rounded object-cover"
+                    />
+                  ) : preview.imageUrl ? (
                     <img
                       src={preview.imageUrl}
                       alt=""
                       className="h-20 w-32 shrink-0 rounded object-cover"
                     />
-                  )}
+                  ) : null}
                   <div className="min-w-0">
                     <div className="font-medium">{preview.title}</div>
+                    {(preview.author || preview.platform) && (
+                      <div className="mt-1 text-[11px] text-kg-muted">
+                        {[preview.author, preview.platform?.toUpperCase(), preview.mediaType === "video" ? "视频" : undefined]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    )}
                     <p className="mt-1 line-clamp-3 text-xs text-kg-muted">
                       {preview.description}
                     </p>
@@ -228,9 +254,11 @@ function CaptureCard({ capture, highlighted }: { capture: InspirationCapture; hi
           </div>
         </div>
       </div>
-      {(capture.previewUrl || capture.sourceUrl) && (
+      {(capture.previewUrl || capture.videoUrl || capture.sourceUrl) && (
         <div className="mt-2 overflow-hidden rounded">
-          {capture.type === "video" && capture.previewUrl ? (
+          {capture.videoUrl ? (
+            <video src={capture.videoUrl} poster={capture.previewUrl} className="h-20 w-full object-cover" controls muted />
+          ) : capture.type === "video" && capture.previewUrl ? (
             <video src={capture.previewUrl} className="h-20 w-full object-cover" muted />
           ) : capture.previewUrl ? (
             <img src={capture.previewUrl} alt="" className="h-20 w-full object-cover" />

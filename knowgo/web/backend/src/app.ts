@@ -123,12 +123,15 @@ app.post("/projects/:id/captures/url", async (c) => {
   if (!url?.trim()) return c.json({ error: "请提供 URL" }, 400);
   const parsed = await parseWebUrl(url.trim());
   const capture = addCapture(c.req.param("id"), {
-    type: "url",
-    sourceUrl: parsed.url,
+    type: parsed.mediaType === "video" && parsed.videoUrl ? "video" : "url",
+    sourceUrl: parsed.resolvedUrl ?? parsed.url,
     previewUrl: parsed.imageUrl,
+    videoUrl: parsed.videoUrl,
     title: parsed.title,
     description: parsed.description,
     platform: parsed.platform,
+    author: parsed.author,
+    mediaType: parsed.mediaType,
   });
   if (!capture) return c.json({ error: "project not found" }, 404);
   return c.json(capture);

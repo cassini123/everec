@@ -37,19 +37,27 @@ export interface InspirationCapture {
   sourceUrl?: string;
   fileName?: string;
   previewUrl?: string;
+  videoUrl?: string;
   title: string;
   description: string;
   platform?: string;
+  author?: string;
+  mediaType?: "video" | "image" | "article";
   createdAt: string;
 }
 
 export interface UrlParseResult {
   url: string;
+  resolvedUrl?: string;
   title: string;
   description: string;
   imageUrl?: string;
+  videoUrl?: string;
   siteName?: string;
   platform: string;
+  author?: string;
+  durationSec?: number;
+  mediaType?: "video" | "image" | "article";
 }
 
 export interface ImageAnalysis {

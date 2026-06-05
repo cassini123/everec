@@ -10,7 +10,9 @@ interface LibraryManifest {
 }
 
 function dataRoot(): string {
-  return process.env.LIBRARY_DATA_DIR ?? path.join(process.cwd(), "data", "library");
+  if (process.env.LIBRARY_DATA_DIR) return process.env.LIBRARY_DATA_DIR;
+  if (process.env.VERCEL) return "/tmp/everec-library";
+  return path.join(process.cwd(), "data", "library");
 }
 
 function manifestPath(root: string): string {
@@ -144,26 +146,18 @@ export function deleteSound(id: string): void {
   writeManifest(root, manifest);
 }
 
-export function downloadHttp(url: string, dest: string, referer?: string): void {
+export async function downloadHttp(url: string, dest: string, referer?: string): Promise<void> {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  const args = [
-    "-L",
-    "-s",
-    "-f",
-    "-o",
-    dest,
-    url,
-    "-H",
-    "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-  ];
-  if (referer) args.push("-H", `Referer: ${referer}`);
-  const result = spawnSync("curl", args, { encoding: "utf8" });
-  if (result.status !== 0) {
-    throw new Error(result.stderr || "curl 下载失败");
-  }
-  if (!fs.existsSync(dest) || fs.statSync(dest).size === 0) {
-    throw new Error("下载失败: 文件为空");
-  }
+  const headers: Record<string, string> = {
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  };
+  if (referer) headers.Referer = referer;
+  const res = await fetch(url, { headers, redirect: "follow" });
+  if (!res.ok) throw new Error(`下载失败: HTTP ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  if (buffer.length === 0) throw new Error("下载失败: 文件为空");
+  fs.writeFileSync(dest, buffer);
 }
 
 export function downloadWithYtDlp(url: string, destDir: string): string {

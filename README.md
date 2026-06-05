@@ -10,6 +10,8 @@ everec/
 │   ├── desktop/      # Tauri 桌面客户端（UI 在 desktop/ui）
 │   └── web/          # Web 端
 ├── simcut/           # AI 视频剪辑（占位，尚未实现）
+├── prerector/        # 协作制片工具（Web 端）
+│   └── web/          # 任务拆解 / 小组 / 同步 / 提醒
 ├── shared/           # 跨项目共享代码
 ├── api/              # Vercel 部署入口
 └── docs/             # 产品文档
@@ -23,6 +25,9 @@ npm install
 
 # Web 端
 npm run dev:web
+
+# Prerector 协作制片
+npm run dev:prerector
 
 # 桌面端（正确路径）
 cd desound/desktop && npm install && npm install --prefix ui && npm run dev

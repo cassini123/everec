@@ -10,6 +10,7 @@ import type {
   StillFrame,
   SubtitleCue,
 } from "../types";
+import { DEFAULT_EFFECT_PRESETS } from "./effectPresets";
 import { analyzeImageFile, analyzeWaveformMatch } from "./colorAnalysis";
 import { guessMime, guessKind } from "./mime";
 import { cachePreviewUrl } from "./previewCache";
@@ -178,13 +179,7 @@ export const api = {
   listEffectPresets: (): Promise<EffectPreset[]> =>
     isTauriApp()
       ? invoke("list_effect_presets")
-      : Promise.resolve([
-          { id: "fade-in", name: "渐显", category: "transition", params: { duration_ms: 500, intensity: 0, scale: 1, blur: 0 } },
-          { id: "fade-out", name: "渐隐", category: "transition", params: { duration_ms: 500, intensity: 0, scale: 1, blur: 0 } },
-          { id: "highlight", name: "高亮", category: "emphasis", params: { duration_ms: 0, intensity: 0.6, scale: 1, blur: 0 } },
-          { id: "zoom-in", name: "推近", category: "motion", params: { duration_ms: 800, intensity: 0, scale: 1.15, blur: 0 } },
-          { id: "blur-bg", name: "背景虚化", category: "style", params: { duration_ms: 0, intensity: 0, scale: 1, blur: 8 } },
-        ]),
+      : Promise.resolve(DEFAULT_EFFECT_PRESETS),
 
   addStillFrame: (
     projectId: string,

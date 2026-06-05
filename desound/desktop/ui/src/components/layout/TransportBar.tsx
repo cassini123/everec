@@ -6,6 +6,7 @@ interface TransportBarProps {
   playing: boolean;
   bpm: number;
   position: number;
+  totalBeats?: number;
   positionSec: number;
   showTransport: boolean;
   onPlay: () => void;
@@ -25,6 +26,7 @@ export function TransportBar({
   playing,
   bpm,
   position,
+  totalBeats = 32,
   positionSec,
   showTransport,
   onPlay,
@@ -79,10 +81,10 @@ export function TransportBar({
             />
           </label>
           <div className="flex gap-0.5">
-            {Array.from({ length: 16 }).map((_, i) => (
+            {Array.from({ length: totalBeats }).map((_, i) => (
               <div
                 key={i}
-                className={`h-4 w-1.5 rounded-sm ${
+                className={`h-4 w-1 rounded-sm ${
                   i === position
                     ? "bg-ds-accent"
                     : i % 4 === 0

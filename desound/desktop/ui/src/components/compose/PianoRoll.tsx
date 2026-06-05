@@ -27,6 +27,7 @@ interface PianoRollProps {
   onDeleteClip: (id: string) => void;
   onOpenPicker: (pick: GridPick) => void;
   onPreviewNote: (note: number) => void;
+  onPositionChange?: (beat: number) => void;
 }
 
 interface DragState {
@@ -52,6 +53,7 @@ export function PianoRoll({
   onDeleteClip,
   onOpenPicker,
   onPreviewNote,
+  onPositionChange,
 }: PianoRollProps) {
   const startNote = 48;
   const endNote = 84;
@@ -187,7 +189,15 @@ export function PianoRoll({
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex h-8 shrink-0 border-b border-ds-border bg-ds-panel">
         <div className="w-14 shrink-0 border-r border-ds-border" />
-        <div className="relative flex-1 overflow-hidden">
+        <div
+          className="relative flex-1 overflow-hidden"
+          onClick={(e) => {
+            if (!onPositionChange) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            onPositionChange(Math.floor(x / BEAT_WIDTH));
+          }}
+        >
           {Array.from({ length: beats }).map((_, beat) => (
             <div
               key={beat}
@@ -197,12 +207,10 @@ export function PianoRoll({
               {beat + 1}
             </div>
           ))}
-          {playing && (
-            <div
-              className="absolute top-0 z-20 h-full w-0.5 bg-ds-accent"
-              style={{ left: position * BEAT_WIDTH + BEAT_WIDTH / 2 }}
-            />
-          )}
+          <div
+            className="absolute top-0 z-20 h-full w-0.5 bg-ds-accent shadow-[0_0_6px_var(--color-ds-accent)]"
+            style={{ left: position * BEAT_WIDTH + BEAT_WIDTH / 2 }}
+          />
         </div>
       </div>
 

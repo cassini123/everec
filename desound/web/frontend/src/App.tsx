@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
 import { TransportBar } from "./components/layout/TransportBar";
@@ -34,6 +34,8 @@ const DEFAULT_DUB: DubSettings = {
   volume: 0.85,
 };
 
+const TOTAL_BEATS = 32;
+
 export default function App() {
   const [workspace, setWorkspace] = useState<Workspace>("library");
   const [instruments, setInstruments] = useState<InstrumentInfo[]>([]);
@@ -49,6 +51,10 @@ export default function App() {
   const [dub, setDub] = useState<DubSettings>(DEFAULT_DUB);
   const [projectTags, setProjectTags] = useState<string[]>([]);
   const [activeFxPreset, setActiveFxPreset] = useState<string | null>(null);
+
+  const positionRef = useRef(position);
+  positionRef.current = position;
+  const playAnchorRef = useRef({ beat: 0, time: 0 });
 
   const refreshLibrary = useCallback(async () => {
     try {
@@ -80,6 +86,49 @@ export default function App() {
       }
     })();
   }, [refreshLibrary, refreshTracks]);
+
+  useEffect(() => {
+    if (!playing) return;
+
+    playAnchorRef.current = { beat: positionRef.current, time: performance.now() };
+    const beatDurMs = (60 / bpm) * 1000;
+
+    const id = window.setInterval(() => {
+      const elapsed = performance.now() - playAnchorRef.current.time;
+      const beatsPassed = Math.floor(elapsed / beatDurMs);
+      const next = (playAnchorRef.current.beat + beatsPassed) % TOTAL_BEATS;
+      setPosition(next);
+    }, Math.min(beatDurMs, 50));
+
+    return () => window.clearInterval(id);
+  }, [playing, bpm]);
+
+  const handlePositionChange = useCallback(
+    (beat: number) => {
+      const clamped = Math.max(0, Math.min(TOTAL_BEATS - 1, beat));
+      setPosition(clamped);
+      if (playing) {
+        playAnchorRef.current = { beat: clamped, time: performance.now() };
+      }
+    },
+    [playing],
+  );
+
+  const handlePlay = useCallback(async () => {
+    await api.initAudio();
+    playAnchorRef.current = { beat: positionRef.current, time: performance.now() };
+    setPlaying(true);
+  }, []);
+
+  const handleStop = useCallback(async () => {
+    setPlaying(false);
+    setPosition(0);
+    try {
+      await api.allNotesOff();
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const showBottomBar =
     workspace === "compose" ||
@@ -126,6 +175,7 @@ export default function App() {
               bpm={bpm}
               position={position}
               playing={playing}
+              onPositionChange={handlePositionChange}
               onTracksChange={refreshTracks}
               onExport={() => {}}
             />
@@ -149,10 +199,11 @@ export default function App() {
         playing={playing}
         bpm={bpm}
         position={position}
+        totalBeats={TOTAL_BEATS}
         positionSec={beatToSec(position, bpm)}
         showTransport={showTransport}
-        onPlay={() => setPlaying(true)}
-        onStop={() => setPlaying(false)}
+        onPlay={handlePlay}
+        onStop={handleStop}
         onBpmChange={setBpm}
         onExport={() => {}}
       />

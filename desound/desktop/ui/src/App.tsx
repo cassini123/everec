@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
 import { TransportBar } from "./components/layout/TransportBar";
@@ -34,6 +34,8 @@ const DEFAULT_DUB: DubSettings = {
   pitch: 0,
   volume: 0.85,
 };
+
+const TOTAL_BEATS = 32;
 
 export default function App() {
   const [workspace, setWorkspace] = useState<Workspace>("compose");
@@ -86,14 +88,42 @@ export default function App() {
     })();
   }, [refreshTracks, refreshLibrary]);
 
+  const positionRef = useRef(0);
+  positionRef.current = position;
+  const playAnchorRef = useRef({ beat: 0, time: 0 });
+
   useEffect(() => {
     if (!playing) return;
-    const beatDur = (60 / bpm) * 250;
+
+    playAnchorRef.current = { beat: positionRef.current, time: performance.now() };
+    const beatDurMs = (60 / bpm) * 1000;
+
     const id = window.setInterval(() => {
-      setPosition((p) => (p >= 31 ? 0 : p + 1));
-    }, beatDur);
-    return () => window.clearInterval(beatDur > 0 ? id : 0);
+      const elapsed = performance.now() - playAnchorRef.current.time;
+      const beatsPassed = Math.floor(elapsed / beatDurMs);
+      const next = (playAnchorRef.current.beat + beatsPassed) % TOTAL_BEATS;
+      setPosition(next);
+    }, Math.min(beatDurMs, 50));
+
+    return () => window.clearInterval(id);
   }, [playing, bpm]);
+
+  const handlePositionChange = useCallback(
+    (beat: number) => {
+      const clamped = Math.max(0, Math.min(TOTAL_BEATS - 1, beat));
+      setPosition(clamped);
+      if (playing) {
+        playAnchorRef.current = { beat: clamped, time: performance.now() };
+      }
+    },
+    [playing],
+  );
+
+  const handlePlay = useCallback(async () => {
+    await api.initAudio();
+    playAnchorRef.current = { beat: positionRef.current, time: performance.now() };
+    setPlaying(true);
+  }, []);
 
   const handleStop = async () => {
     setPlaying(false);
@@ -154,6 +184,7 @@ export default function App() {
               bpm={bpm}
               position={position}
               playing={playing}
+              onPositionChange={handlePositionChange}
               onTracksChange={refreshTracks}
               onExport={() => setExportOpen(true)}
             />
@@ -177,9 +208,10 @@ export default function App() {
         playing={playing}
         bpm={bpm}
         position={position}
+        totalBeats={TOTAL_BEATS}
         positionSec={beatToSec(position, bpm)}
         showTransport={showTransport}
-        onPlay={() => setPlaying(true)}
+        onPlay={handlePlay}
         onStop={handleStop}
         onBpmChange={setBpm}
         onExport={() => setExportOpen(true)}

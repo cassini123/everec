@@ -42,8 +42,22 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     },
     ...init,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? res.statusText);
+  const text = await res.text();
+  let data: unknown;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    const preview = text.slice(0, 80).replace(/\s+/g, " ");
+    throw new Error(
+      res.ok
+        ? `API returned non-JSON (${preview})`
+        : `API error ${res.status}: ${preview || res.statusText}`,
+    );
+  }
+  if (!res.ok) {
+    const err = data as { error?: string };
+    throw new Error(err?.error ?? res.statusText);
+  }
   return data as T;
 }
 

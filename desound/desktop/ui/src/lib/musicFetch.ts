@@ -1,4 +1,5 @@
 import type { LinkParseResult, MusicSearchResult, SoundAsset } from "../types";
+import { searchMusicOnline } from "@everec/shared";
 import { DESKTOP_APP_HINT, invoke, isTauriApp } from "./tauri";
 
 const USER_AGENT =
@@ -16,6 +17,8 @@ function requireDesktop(): void {
   if (!isTauriApp()) throw new Error(DESKTOP_APP_HINT);
 }
 
+export { searchMusicOnline };
+
 export function detectPlatform(url: string): string | null {
   const lower = url.toLowerCase();
   if (lower.includes("bilibili.com") || lower.includes("b23.tv")) return "bilibili";
@@ -30,63 +33,6 @@ function extractBvid(url: string): string | null {
   const rest = url.slice(idx);
   const match = rest.match(/^BV[a-zA-Z0-9]+/);
   return match ? match[0] : null;
-}
-
-async function searchItunes(query: string, limit: number): Promise<MusicSearchResult[]> {
-  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=${limit}&country=CN`;
-  const data = await fetchJson<{ results?: Record<string, unknown>[] }>(url);
-  const results: MusicSearchResult[] = [];
-  for (const item of data.results ?? []) {
-    const id = String(item.trackId ?? item.collectionId ?? "");
-    if (!id) continue;
-    results.push({
-      id: `itunes:${id}`,
-      title: String(item.trackName ?? item.collectionName ?? "Unknown"),
-      artist: String(item.artistName ?? "Unknown"),
-      album: String(item.collectionName ?? ""),
-      durationMs: Number(item.trackTimeMillis ?? 0),
-      previewUrl: item.previewUrl ? String(item.previewUrl) : undefined,
-      coverUrl: item.artworkUrl100 ? String(item.artworkUrl100) : undefined,
-      source: "itunes",
-    });
-  }
-  return results;
-}
-
-async function searchNetease(query: string, limit: number): Promise<MusicSearchResult[]> {
-  const url = `https://music.163.com/api/search/get/web?s=${encodeURIComponent(query)}&type=1&limit=${limit}`;
-  const data = await fetchJson<{
-    result?: { songs?: Record<string, unknown>[] };
-  }>(url, "https://music.163.com/");
-  const results: MusicSearchResult[] = [];
-  for (const song of data.result?.songs ?? []) {
-    const id = String(song.id ?? "");
-    if (!id) continue;
-    const artists = (song.artists as { name?: string }[] | undefined)?.map((a) => a.name ?? "").filter(Boolean) ?? [];
-    results.push({
-      id: `netease:${id}`,
-      title: String(song.name ?? "Unknown"),
-      artist: artists.length ? artists.join(", ") : "Unknown",
-      album: String((song.album as { name?: string })?.name ?? ""),
-      durationMs: Number(song.duration ?? 0),
-      coverUrl: (song.album as { picUrl?: string })?.picUrl,
-      source: "netease",
-    });
-  }
-  return results;
-}
-
-export async function searchMusicOnline(query: string, limit = 20): Promise<MusicSearchResult[]> {
-  const q = query.trim();
-  if (!q) throw new Error("请输入搜索关键词");
-  const perSource = Math.max(5, Math.floor(limit / 2));
-  const [netease, itunes] = await Promise.all([
-    searchNetease(q, perSource).catch(() => []),
-    searchItunes(q, perSource).catch(() => []),
-  ]);
-  const results = [...netease, ...itunes].slice(0, limit);
-  if (!results.length) throw new Error("未找到相关歌曲");
-  return results;
 }
 
 async function parseBilibili(url: string): Promise<LinkParseResult> {
@@ -181,12 +127,36 @@ export async function saveSearchResultToLibrary(result: MusicSearchResult): Prom
       return await importViaHttp(url, displayName, tags, sourceLabel, "https://music.163.com/");
     } catch {
       return invoke<SoundAsset>("download_media_with_ytdlp", {
-        url,
+        url: `https://music.163.com/#/song?id=${songId}`,
         name: displayName,
         tags,
         sourceLabel,
       });
     }
+  }
+
+  if (result.source === "qq") {
+    const parts = result.id.split(":");
+    const mid = parts[2];
+    const pageUrl = mid
+      ? `https://y.qq.com/n/ryqq/song/${mid}.html`
+      : `https://y.qq.com/n/ryqq/song/${parts[1]}.html`;
+    return invoke<SoundAsset>("download_media_with_ytdlp", {
+      url: pageUrl,
+      name: displayName,
+      tags,
+      sourceLabel,
+    });
+  }
+
+  if (result.source === "kugou") {
+    const hash = result.id.split(":")[1];
+    return invoke<SoundAsset>("download_media_with_ytdlp", {
+      url: `https://www.kugou.com/song/#hash=${hash}`,
+      name: displayName,
+      tags,
+      sourceLabel,
+    });
   }
 
   throw new Error("该歌曲暂无可用音频");

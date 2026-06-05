@@ -15,6 +15,15 @@ export const PLATFORM_LABELS: Record<string, string> = {
   xiaohongshu: "小红书",
   itunes: "iTunes",
   netease: "网易云",
+  qq: "QQ音乐",
+  kugou: "酷狗音乐",
+};
+
+export const MUSIC_SOURCE_LABELS: Record<string, string> = {
+  itunes: "iTunes",
+  netease: "网易云音乐",
+  qq: "QQ音乐",
+  kugou: "酷狗音乐",
 };
 
 export const USER_AGENT =

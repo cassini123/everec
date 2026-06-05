@@ -368,6 +368,9 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
                 搜索
               </button>
             </div>
+            <p className="px-4 pb-2 text-[11px] text-ds-muted">
+              同时搜索 iTunes、网易云音乐、QQ音乐、酷狗音乐
+            </p>
 
             <div className="flex-1 overflow-auto p-4">
               {searchResults.length === 0 && !searching ? (

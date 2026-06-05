@@ -126,9 +126,31 @@ app.post("/library/import-search", async (c) => {
         if (process.env.VERCEL) {
           return c.json({ error: "Vercel 环境暂不支持网易云完整下载，请尝试 iTunes 预览" }, 400);
         }
-        const downloaded = downloadWithYtDlp(url, tmp);
+        const downloaded = downloadWithYtDlp(`https://music.163.com/#/song?id=${songId}`, tmp);
         return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
       }
+    }
+    if (source === "qq") {
+      const parts = resultId.split(":");
+      const mid = parts[2];
+      const pageUrl = mid
+        ? `https://y.qq.com/n/ryqq/song/${mid}.html`
+        : `https://y.qq.com/n/ryqq/song/${parts[1]}.html`;
+      if (process.env.VERCEL) {
+        return c.json({ error: "Vercel 环境暂不支持 QQ 音乐下载，请使用桌面端或 iTunes 预览" }, 400);
+      }
+      const downloaded = downloadWithYtDlp(pageUrl, tmp);
+      return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
+    }
+    if (source === "kugou") {
+      const parts = resultId.split(":");
+      const hash = parts[1];
+      const pageUrl = `https://www.kugou.com/song/#hash=${hash}`;
+      if (process.env.VERCEL) {
+        return c.json({ error: "Vercel 环境暂不支持酷狗音乐下载，请使用桌面端或 iTunes 预览" }, 400);
+      }
+      const downloaded = downloadWithYtDlp(pageUrl, tmp);
+      return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
     }
     return c.json({ error: "该歌曲暂无可用音频" }, 400);
   } catch (err) {

@@ -2164,12 +2164,39 @@ import path2 from "node:path";
 var USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 // shared/src/library/search.ts
-async function fetchJson(url, referer) {
-  const headers = { "User-Agent": USER_AGENT };
+var KUGOU_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148";
+async function fetchJson(url, referer, userAgent = USER_AGENT) {
+  const headers = { "User-Agent": userAgent };
   if (referer) headers.Referer = referer;
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+function normalizeKey(title, artist) {
+  return `${title.toLowerCase().replace(/\s+/g, "")}|${artist.toLowerCase().replace(/\s+/g, "")}`;
+}
+function rankResults(query, results) {
+  const q = query.trim().toLowerCase();
+  return [...results].sort((a, b) => {
+    const aTitle = a.title.toLowerCase();
+    const bTitle = b.title.toLowerCase();
+    const aExact = aTitle.includes(q) || q.includes(aTitle) ? 1 : 0;
+    const bExact = bTitle.includes(q) || q.includes(bTitle) ? 1 : 0;
+    if (aExact !== bExact) return bExact - aExact;
+    const sourceOrder = { netease: 0, qq: 1, kugou: 2, itunes: 3 };
+    return (sourceOrder[a.source] ?? 9) - (sourceOrder[b.source] ?? 9);
+  });
+}
+function dedupeResults(results) {
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const item of results) {
+    const key = normalizeKey(item.title, item.artist);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
 }
 function detectPlatform(url) {
   const lower = url.toLowerCase();
@@ -2205,7 +2232,7 @@ async function searchItunes(query, limit) {
   return results;
 }
 async function searchNetease(query, limit) {
-  const url = `https://music.163.com/api/search/get/web?s=${encodeURIComponent(query)}&type=1&limit=${limit}`;
+  const url = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(query)}&type=1&offset=0&limit=${limit}`;
   const data = await fetchJson(
     url,
     "https://music.163.com/"
@@ -2214,28 +2241,100 @@ async function searchNetease(query, limit) {
   for (const song of data.result?.songs ?? []) {
     const id = String(song.id ?? "");
     if (!id) continue;
-    const artists = song.artists?.map((a) => a.name ?? "").filter(Boolean) ?? [];
+    const artists = song.ar?.map((a) => a.name ?? "").filter(Boolean) ?? [];
+    const album = song.al;
     results.push({
       id: `netease:${id}`,
       title: String(song.name ?? "Unknown"),
       artist: artists.length ? artists.join(", ") : "Unknown",
-      album: String(song.album?.name ?? ""),
-      durationMs: Number(song.duration ?? 0),
-      coverUrl: song.album?.picUrl,
+      album: album?.name ?? "",
+      durationMs: Number(song.dt ?? 0),
+      coverUrl: album?.picUrl ? String(album.picUrl) : void 0,
       source: "netease"
     });
   }
   return results;
 }
+async function searchQQOnce(query, limit) {
+  const url = `https://c6.y.qq.com/splcloud/fcgi-bin/smartbox_new.fcg?format=json&key=${encodeURIComponent(query)}`;
+  const data = await fetchJson(url, "https://y.qq.com/");
+  const results = [];
+  for (const item of data.data?.song?.itemlist ?? []) {
+    const id = String(item.id ?? "");
+    const mid = String(item.mid ?? "");
+    if (!id) continue;
+    results.push({
+      id: mid ? `qq:${id}:${mid}` : `qq:${id}`,
+      title: String(item.name ?? "Unknown"),
+      artist: String(item.singer ?? "Unknown"),
+      album: "",
+      durationMs: 0,
+      source: "qq"
+    });
+    if (results.length >= limit) break;
+  }
+  return results;
+}
+function searchQueries(query) {
+  const trimmed = query.trim();
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  const queries = [trimmed];
+  if (parts.length > 1) queries.push(parts[parts.length - 1]);
+  return [...new Set(queries)];
+}
+async function searchQQ(query, limit) {
+  for (const q of searchQueries(query)) {
+    const results = await searchQQOnce(q, limit);
+    if (results.length) return results;
+  }
+  return [];
+}
+async function searchKugouOnce(query, limit) {
+  const url = `http://mobilecdn.kugou.com/api/v3/search/song?format=json&keyword=${encodeURIComponent(query)}&page=1&pagesize=${limit}&showtype=1`;
+  const data = await fetchJson(
+    url,
+    "https://www.kugou.com/",
+    KUGOU_USER_AGENT
+  );
+  const results = [];
+  for (const song of data.data?.info ?? []) {
+    const hash = String(song.hash ?? "");
+    if (!hash) continue;
+    const albumId = String(song.album_id ?? "");
+    results.push({
+      id: albumId ? `kugou:${hash}:${albumId}` : `kugou:${hash}`,
+      title: String(song.songname ?? "Unknown"),
+      artist: String(song.singername ?? "Unknown"),
+      album: String(song.album_name ?? ""),
+      durationMs: Number(song.duration ?? 0) * 1e3,
+      source: "kugou"
+    });
+  }
+  return results;
+}
+async function searchKugou(query, limit) {
+  const merged = [];
+  for (const q of searchQueries(query)) {
+    const results = await searchKugouOnce(q, limit);
+    merged.push(...results);
+    if (merged.length >= limit) break;
+  }
+  return dedupeResults(merged).slice(0, limit);
+}
 async function searchMusicOnline(query, limit = 20) {
   const q = query.trim();
   if (!q) throw new Error("\u8BF7\u8F93\u5165\u641C\u7D22\u5173\u952E\u8BCD");
-  const perSource = Math.max(5, Math.floor(limit / 2));
-  const [netease, itunes] = await Promise.all([
+  const perSource = Math.max(3, Math.ceil(limit / 4));
+  const [netease, qq, kugou, itunes] = await Promise.all([
     searchNetease(q, perSource).catch(() => []),
+    searchQQ(q, perSource).catch(() => []),
+    searchKugou(q, perSource).catch(() => []),
     searchItunes(q, perSource).catch(() => [])
   ]);
-  const results = [...netease, ...itunes].slice(0, limit);
+  const results = rankResults(q, dedupeResults([...netease, ...qq, ...kugou, ...itunes])).slice(
+    0,
+    limit
+  );
   if (!results.length) throw new Error("\u672A\u627E\u5230\u76F8\u5173\u6B4C\u66F2");
   return results;
 }
@@ -2583,9 +2682,29 @@ app.post("/library/import-search", async (c) => {
         if (process.env.VERCEL) {
           return c.json({ error: "Vercel \u73AF\u5883\u6682\u4E0D\u652F\u6301\u7F51\u6613\u4E91\u5B8C\u6574\u4E0B\u8F7D\uFF0C\u8BF7\u5C1D\u8BD5 iTunes \u9884\u89C8" }, 400);
         }
-        const downloaded = downloadWithYtDlp(url, tmp);
+        const downloaded = downloadWithYtDlp(`https://music.163.com/#/song?id=${songId}`, tmp);
         return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
       }
+    }
+    if (source === "qq") {
+      const parts = resultId.split(":");
+      const mid = parts[2];
+      const pageUrl = mid ? `https://y.qq.com/n/ryqq/song/${mid}.html` : `https://y.qq.com/n/ryqq/song/${parts[1]}.html`;
+      if (process.env.VERCEL) {
+        return c.json({ error: "Vercel \u73AF\u5883\u6682\u4E0D\u652F\u6301 QQ \u97F3\u4E50\u4E0B\u8F7D\uFF0C\u8BF7\u4F7F\u7528\u684C\u9762\u7AEF\u6216 iTunes \u9884\u89C8" }, 400);
+      }
+      const downloaded = downloadWithYtDlp(pageUrl, tmp);
+      return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
+    }
+    if (source === "kugou") {
+      const parts = resultId.split(":");
+      const hash = parts[1];
+      const pageUrl = `https://www.kugou.com/song/#hash=${hash}`;
+      if (process.env.VERCEL) {
+        return c.json({ error: "Vercel \u73AF\u5883\u6682\u4E0D\u652F\u6301\u9177\u72D7\u97F3\u4E50\u4E0B\u8F7D\uFF0C\u8BF7\u4F7F\u7528\u684C\u9762\u7AEF\u6216 iTunes \u9884\u89C8" }, 400);
+      }
+      const downloaded = downloadWithYtDlp(pageUrl, tmp);
+      return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
     }
     return c.json({ error: "\u8BE5\u6B4C\u66F2\u6682\u65E0\u53EF\u7528\u97F3\u9891" }, 400);
   } catch (err) {

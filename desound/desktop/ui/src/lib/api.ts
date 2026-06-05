@@ -77,7 +77,7 @@ export const api = {
   saveFoleySound: (name: string, presetId: string, tags?: string[]): Promise<SoundAsset> =>
     requireDesktop(() => invoke("save_foley_sound", { name, presetId, tags })),
 
-  uploadFoleyFile: async (): Promise<SoundAsset> => {
+  uploadFoleyFile: async (_file?: File): Promise<SoundAsset> => {
     const path = await open({
       multiple: false,
       filters: [{ name: "Audio", extensions: ["wav", "mp3", "flac", "aac", "ogg", "m4a"] }],

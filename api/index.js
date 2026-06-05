@@ -2238,10 +2238,18 @@ async function resolveMusicAudioUrl(result) {
     return { url: result.previewUrl, ext: result.previewUrl.includes(".m4a") ? "m4a" : "mp3" };
   }
   if (result.source === "bilibili") {
-    const bvid = result.id.replace("bilibili:", "");
-    const audioUrl = result.previewUrl ?? await getBilibiliAudioUrl(bvid);
+    const bvid2 = result.id.replace("bilibili:", "");
+    const audioUrl = result.previewUrl ?? await getBilibiliAudioUrl(bvid2);
     if (!audioUrl) throw new Error("\u65E0\u6CD5\u89E3\u6790 Bilibili \u97F3\u9891");
     return { url: audioUrl, referer: BILI_REFERER, ext: "m4a" };
+  }
+  const bvid = result.playBvid;
+  if (bvid) {
+    const audioUrl = await getBilibiliAudioUrl(bvid);
+    if (audioUrl) return { url: audioUrl, referer: BILI_REFERER, ext: "m4a" };
+  }
+  if (result.previewUrl) {
+    return { url: result.previewUrl, referer: BILI_REFERER, ext: "m4a" };
   }
   const bili = await findBilibiliAudio(result.title, result.artist);
   if (bili) {
@@ -2254,7 +2262,7 @@ async function enrichSearchResult(result, bilibiliPool = []) {
   if (result.source === "bilibili") {
     const bvid = result.id.replace("bilibili:", "");
     const audioUrl = await getBilibiliAudioUrl(bvid);
-    return audioUrl ? { ...result, previewUrl: audioUrl } : result;
+    return audioUrl ? { ...result, previewUrl: audioUrl, playBvid: bvid } : result;
   }
   for (const candidate of bilibiliPool) {
     if (candidate.source !== "bilibili") continue;
@@ -2268,6 +2276,7 @@ async function enrichSearchResult(result, bilibiliPool = []) {
       return {
         ...result,
         previewUrl: audioUrl,
+        playBvid: bvid,
         coverUrl: result.coverUrl ?? candidate.coverUrl
       };
     }
@@ -2277,6 +2286,7 @@ async function enrichSearchResult(result, bilibiliPool = []) {
   return {
     ...result,
     previewUrl: bili.audioUrl,
+    playBvid: bili.bvid,
     coverUrl: result.coverUrl ?? bili.coverUrl
   };
 }
@@ -2821,7 +2831,7 @@ app.post("/library/upload", async (c) => {
   }
 });
 app.post("/library/import-search", async (c) => {
-  const { resultId, title, artist, previewUrl, source } = await c.req.json();
+  const { resultId, title, artist, previewUrl, source, playBvid } = await c.req.json();
   const displayName = `${title} - ${artist}`;
   const tags = ["bgm", "search", source];
   const sourceLabel = `search:${source}`;
@@ -2842,7 +2852,9 @@ app.post("/library/import-search", async (c) => {
       artist,
       album: "",
       durationMs: 0,
-      source
+      source,
+      previewUrl,
+      playBvid
     });
     const dest = path2.join(tmp, `search.${resolved.ext}`);
     await downloadHttp(resolved.url, dest, resolved.referer);
@@ -2858,6 +2870,7 @@ app.get("/search/play", async (c) => {
   const title = c.req.query("title") ?? "";
   const artist = c.req.query("artist") ?? "";
   const source = c.req.query("source") ?? "";
+  const playBvid = c.req.query("playBvid") ?? "";
   try {
     const resolved = await resolveMusicAudioUrl({
       id: resultId,
@@ -2865,7 +2878,8 @@ app.get("/search/play", async (c) => {
       artist,
       album: "",
       durationMs: 0,
-      source
+      source,
+      playBvid: playBvid || void 0
     });
     const headers = { "User-Agent": "Mozilla/5.0" };
     if (resolved.referer) headers.Referer = resolved.referer;

@@ -118,6 +118,16 @@ export async function resolveMusicAudioUrl(result: MusicSearchResult): Promise<{
     return { url: audioUrl, referer: BILI_REFERER, ext: "m4a" };
   }
 
+  const bvid = result.playBvid;
+  if (bvid) {
+    const audioUrl = await getBilibiliAudioUrl(bvid);
+    if (audioUrl) return { url: audioUrl, referer: BILI_REFERER, ext: "m4a" };
+  }
+
+  if (result.previewUrl) {
+    return { url: result.previewUrl, referer: BILI_REFERER, ext: "m4a" };
+  }
+
   const bili = await findBilibiliAudio(result.title, result.artist);
   if (bili) {
     return { url: bili.audioUrl, referer: BILI_REFERER, ext: "m4a" };
@@ -135,7 +145,7 @@ export async function enrichSearchResult(
   if (result.source === "bilibili") {
     const bvid = result.id.replace("bilibili:", "");
     const audioUrl = await getBilibiliAudioUrl(bvid);
-    return audioUrl ? { ...result, previewUrl: audioUrl } : result;
+    return audioUrl ? { ...result, previewUrl: audioUrl, playBvid: bvid } : result;
   }
 
   for (const candidate of bilibiliPool) {
@@ -153,6 +163,7 @@ export async function enrichSearchResult(
       return {
         ...result,
         previewUrl: audioUrl,
+        playBvid: bvid,
         coverUrl: result.coverUrl ?? candidate.coverUrl,
       };
     }
@@ -163,6 +174,7 @@ export async function enrichSearchResult(
   return {
     ...result,
     previewUrl: bili.audioUrl,
+    playBvid: bili.bvid,
     coverUrl: result.coverUrl ?? bili.coverUrl,
   };
 }

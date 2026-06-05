@@ -96,12 +96,13 @@ app.post("/library/upload", async (c) => {
 });
 
 app.post("/library/import-search", async (c) => {
-  const { resultId, title, artist, previewUrl, source } = await c.req.json<{
+  const { resultId, title, artist, previewUrl, source, playBvid } = await c.req.json<{
     resultId: string;
     title: string;
     artist: string;
     previewUrl?: string;
     source: string;
+    playBvid?: string;
   }>();
   const displayName = `${title} - ${artist}`;
   const tags = ["bgm", "search", source];
@@ -127,6 +128,8 @@ app.post("/library/import-search", async (c) => {
       album: "",
       durationMs: 0,
       source,
+      previewUrl,
+      playBvid,
     });
     const dest = path.join(tmp, `search.${resolved.ext}`);
     await downloadHttp(resolved.url, dest, resolved.referer);
@@ -144,6 +147,8 @@ app.get("/search/play", async (c) => {
   const artist = c.req.query("artist") ?? "";
   const source = c.req.query("source") ?? "";
 
+  const playBvid = c.req.query("playBvid") ?? "";
+
   try {
     const resolved = await resolveMusicAudioUrl({
       id: resultId,
@@ -152,6 +157,7 @@ app.get("/search/play", async (c) => {
       album: "",
       durationMs: 0,
       source,
+      playBvid: playBvid || undefined,
     });
 
     const headers: Record<string, string> = { "User-Agent": "Mozilla/5.0" };

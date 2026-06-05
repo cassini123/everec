@@ -44,6 +44,7 @@ export interface MusicSearchResult {
   previewUrl?: string;
   coverUrl?: string;
   source: string;
+  playBvid?: string;
 }
 
 export interface LinkParseResult {

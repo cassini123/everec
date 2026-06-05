@@ -81,6 +81,8 @@ export const api = {
       artist: result.artist,
       source: result.source,
     });
+    if (result.playBvid) params.set("playBvid", result.playBvid);
+    else if (result.source === "bilibili") params.set("playBvid", result.id.replace("bilibili:", ""));
     return `${API}/search/play?${params.toString()}`;
   },
 
@@ -101,6 +103,7 @@ export const api = {
         artist: result.artist,
         previewUrl: result.previewUrl,
         source: result.source,
+        playBvid: result.playBvid,
       }),
     }),
 

@@ -6,7 +6,8 @@ import { NotePickerModal } from "../components/compose/NotePickerModal";
 import { PianoRoll, type GridPick } from "../components/compose/PianoRoll";
 import { MasterOverview } from "../components/compose/MasterOverview";
 import { TrackList } from "../components/compose/TrackList";
-import type { InstrumentInfo, NoteClip, TrackInfo } from "../types";
+import { ProjectPicker } from "../components/layout/ProjectPicker";
+import type { DesoundProjectSummary, InstrumentInfo, NoteClip, TrackInfo } from "../types";
 
 const TRACK_COLORS = ["#ff6b2c", "#4da3ff", "#3dd68c", "#a78bfa", "#f472b6"];
 const TOTAL_BEATS = 32;
@@ -17,6 +18,10 @@ interface ComposeViewProps {
   bpm: number;
   position: number;
   playing: boolean;
+  projects: DesoundProjectSummary[];
+  activeProjectId: string | null;
+  onProjectSelect: (id: string) => void;
+  onGoToProjects?: () => void;
   onTracksChange: () => void;
   onExport: () => void;
 }
@@ -27,6 +32,10 @@ export function ComposeView({
   bpm,
   position,
   playing,
+  projects,
+  activeProjectId,
+  onProjectSelect,
+  onGoToProjects,
   onTracksChange,
   onExport,
 }: ComposeViewProps) {
@@ -151,6 +160,12 @@ export function ComposeView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-ds-border bg-ds-panel px-4 py-2">
+        <ProjectPicker
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onSelect={onProjectSelect}
+          onManage={onGoToProjects}
+        />
         <InstrumentPicker
           instruments={instruments}
           value={currentSlug}

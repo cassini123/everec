@@ -2,14 +2,31 @@ import { useMemo, useRef, useState } from "react";
 import { Loader2, Play, Plus, RotateCcw, Save, Search, Upload, Volume2 } from "lucide-react";
 import { api } from "../lib/api";
 import { FOLEY_PRESETS, synthesizeFoley } from "../lib/foley";
-import type { FoleyPreset, SfxSearchResult, SoundAsset } from "../types";
+import { ProjectPicker } from "../components/layout/ProjectPicker";
+import type {
+  DesoundProjectSummary,
+  FoleyPreset,
+  SfxSearchResult,
+  SoundAsset,
+} from "../types";
 
 interface FoleyViewProps {
   sounds: SoundAsset[];
+  projects: DesoundProjectSummary[];
+  activeProjectId: string | null;
+  onProjectSelect: (id: string) => void;
+  onGoToProjects?: () => void;
   onSaved: () => void;
 }
 
-export function FoleyView({ sounds, onSaved }: FoleyViewProps) {
+export function FoleyView({
+  sounds,
+  projects,
+  activeProjectId,
+  onProjectSelect,
+  onGoToProjects,
+  onSaved,
+}: FoleyViewProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewAudioRef = useRef<HTMLAudioElement>(null);
   const [preset, setPreset] = useState<FoleyPreset>(FOLEY_PRESETS[0]);
@@ -149,7 +166,17 @@ export function FoleyView({ sounds, onSaved }: FoleyViewProps) {
   };
 
   return (
-    <div className="flex min-h-0 flex-1">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center border-b border-ds-border bg-ds-panel px-4 py-2">
+        <ProjectPicker
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onSelect={onProjectSelect}
+          onManage={onGoToProjects}
+        />
+      </div>
+
+      <div className="flex min-h-0 flex-1">
       <input
         ref={fileInputRef}
         type="file"
@@ -396,6 +423,7 @@ export function FoleyView({ sounds, onSaved }: FoleyViewProps) {
           </div>
         </aside>
       )}
+      </div>
     </div>
   );
 }

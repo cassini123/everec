@@ -1,14 +1,23 @@
 import { Check, Waves } from "lucide-react";
 import { FX_PRESETS } from "../lib/fxPresets";
-import type { EffectSettings } from "../types";
+import { ProjectPicker } from "../components/layout/ProjectPicker";
+import type { DesoundProjectSummary, EffectSettings } from "../types";
 
 interface ProcessingViewProps {
+  projects: DesoundProjectSummary[];
+  activeProjectId: string | null;
+  onProjectSelect: (id: string) => void;
+  onGoToProjects?: () => void;
   activePresetId: string | null;
   effects: EffectSettings;
   onApplyPreset: (presetId: string, effects: EffectSettings) => void;
 }
 
 export function ProcessingView({
+  projects,
+  activeProjectId,
+  onProjectSelect,
+  onGoToProjects,
   activePresetId,
   effects,
   onApplyPreset,
@@ -16,6 +25,14 @@ export function ProcessingView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="border-b border-ds-border bg-ds-panel px-4 py-3">
+        <div className="mb-2">
+          <ProjectPicker
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onSelect={onProjectSelect}
+            onManage={onGoToProjects}
+          />
+        </div>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <Waves className="h-5 w-5 text-ds-blue" />
           声音处理

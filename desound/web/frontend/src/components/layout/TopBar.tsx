@@ -2,6 +2,7 @@ import { Disc3, FolderOpen, Sparkles, Tag, Waves } from "lucide-react";
 import type { Workspace } from "../../types";
 
 const labels: Record<Workspace, string> = {
+  projects: "项目 · 文件管理",
   library: "Library · 素材库",
   foley: "Foley · 拟声设计",
   compose: "Compose · 音乐设计/时间轴",
@@ -11,10 +12,11 @@ const labels: Record<Workspace, string> = {
 
 interface TopBarProps {
   workspace: Workspace;
+  projectName?: string;
   projectTags?: string[];
 }
 
-export function TopBar({ workspace, projectTags = [] }: TopBarProps) {
+export function TopBar({ workspace, projectName, projectTags = [] }: TopBarProps) {
   return (
     <header className="flex h-11 shrink-0 items-center justify-between border-b border-ds-border bg-ds-surface px-4">
       <div className="flex items-center gap-3">
@@ -43,7 +45,7 @@ export function TopBar({ workspace, projectTags = [] }: TopBarProps) {
       <div className="flex items-center gap-4 text-xs text-ds-muted">
         <span className="flex items-center gap-1.5">
           <FolderOpen className="h-3.5 w-3.5" />
-          Untitled Project
+          {projectName ?? "未选择项目"}
         </span>
         <span className="flex items-center gap-1.5">
           <Waves className="h-3.5 w-3.5 text-ds-green" />

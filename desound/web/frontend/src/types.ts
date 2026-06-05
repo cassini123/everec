@@ -1,5 +1,7 @@
 export type {
   Workspace,
+  DesoundProject,
+  DesoundProjectSummary,
   ExportFormat,
   InstrumentInfo,
   TrackInfo,

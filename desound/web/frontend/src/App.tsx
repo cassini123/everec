@@ -8,9 +8,19 @@ import { FoleyView } from "./views/FoleyView";
 import { ComposeView } from "./views/ComposeView";
 import { DesignView } from "./views/DesignView";
 import { ProcessingView } from "./views/ProcessingView";
+import { ProjectsView } from "./views/ProjectsView";
 import { api, beatToSec } from "./lib/api";
+import {
+  ensureDefaultProject,
+  getActiveProjectId,
+  getProject,
+  listProjectSummaries,
+  setActiveProjectId,
+} from "./lib/projects";
 import type {
   BottomPanel,
+  DesoundProject,
+  DesoundProjectSummary,
   DubSettings,
   EffectSettings,
   InstrumentInfo,
@@ -49,6 +59,31 @@ export default function App() {
   const [dub, setDub] = useState<DubSettings>(DEFAULT_DUB);
   const [projectTags, setProjectTags] = useState<string[]>([]);
   const [activeFxPreset, setActiveFxPreset] = useState<string | null>(null);
+  const [projects, setProjects] = useState<DesoundProjectSummary[]>([]);
+  const [activeProject, setActiveProject] = useState<DesoundProject | null>(null);
+
+  const refreshProjects = useCallback(() => {
+    setProjects(listProjectSummaries());
+    const activeId = getActiveProjectId();
+    if (activeId) {
+      const project = getProject(activeId);
+      if (project) setActiveProject(project);
+    }
+  }, []);
+
+  const handleSelectProject = useCallback((project: DesoundProject) => {
+    setActiveProjectId(project.id);
+    setActiveProject(project);
+    refreshProjects();
+    setWorkspace("library");
+  }, [refreshProjects]);
+
+  const handleProjectPickerSelect = useCallback((id: string) => {
+    setActiveProjectId(id);
+    const project = getProject(id);
+    if (project) setActiveProject(project);
+    refreshProjects();
+  }, [refreshProjects]);
 
   const refreshLibrary = useCallback(async () => {
     try {
@@ -69,6 +104,9 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
+        const project = ensureDefaultProject();
+        setActiveProject(project);
+        refreshProjects();
         setInstruments(await api.listInstruments());
         await api.initAudio();
         await refreshTracks();
@@ -79,7 +117,7 @@ export default function App() {
         setReady(true);
       }
     })();
-  }, [refreshLibrary, refreshTracks]);
+  }, [refreshLibrary, refreshTracks, refreshProjects]);
 
   const showBottomBar =
     workspace === "compose" ||
@@ -91,7 +129,11 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-ds-bg">
-      <TopBar workspace={workspace} projectTags={projectTags} />
+      <TopBar
+        workspace={workspace}
+        projectName={activeProject?.name}
+        projectTags={projectTags}
+      />
       <div className="flex min-h-0 flex-1">
         <Sidebar workspace={workspace} onChange={setWorkspace} />
         <main className="flex min-w-0 flex-1 flex-col">
@@ -99,12 +141,37 @@ export default function App() {
             <div className="flex flex-1 items-center justify-center text-ds-muted">
               加载 everec Web 端…
             </div>
+          ) : workspace === "projects" ? (
+            <ProjectsView
+              projects={projects}
+              activeProjectId={activeProject?.id ?? null}
+              onRefresh={refreshProjects}
+              onSelect={handleSelectProject}
+            />
           ) : workspace === "library" ? (
-            <LibraryView sounds={sounds} onRefresh={refreshLibrary} />
+            <LibraryView
+              sounds={sounds}
+              projects={projects}
+              activeProjectId={activeProject?.id ?? null}
+              onProjectSelect={handleProjectPickerSelect}
+              onGoToProjects={() => setWorkspace("projects")}
+              onRefresh={refreshLibrary}
+            />
           ) : workspace === "foley" ? (
-            <FoleyView sounds={sounds} onSaved={refreshLibrary} />
+            <FoleyView
+              sounds={sounds}
+              projects={projects}
+              activeProjectId={activeProject?.id ?? null}
+              onProjectSelect={handleProjectPickerSelect}
+              onGoToProjects={() => setWorkspace("projects")}
+              onSaved={refreshLibrary}
+            />
           ) : workspace === "processing" ? (
             <ProcessingView
+              projects={projects}
+              activeProjectId={activeProject?.id ?? null}
+              onProjectSelect={handleProjectPickerSelect}
+              onGoToProjects={() => setWorkspace("projects")}
               activePresetId={activeFxPreset}
               effects={effects}
               onApplyPreset={(id, fx) => {
@@ -115,6 +182,10 @@ export default function App() {
             />
           ) : workspace === "design" ? (
             <DesignView
+              projects={projects}
+              activeProjectId={activeProject?.id ?? null}
+              onProjectSelect={handleProjectPickerSelect}
+              onGoToProjects={() => setWorkspace("projects")}
               onApplyKeywords={(keywords) =>
                 setProjectTags((prev) => [...new Set([...prev, ...keywords])])
               }
@@ -126,6 +197,10 @@ export default function App() {
               bpm={bpm}
               position={position}
               playing={playing}
+              projects={projects}
+              activeProjectId={activeProject?.id ?? null}
+              onProjectSelect={handleProjectPickerSelect}
+              onGoToProjects={() => setWorkspace("projects")}
               onTracksChange={refreshTracks}
               onExport={() => {}}
             />

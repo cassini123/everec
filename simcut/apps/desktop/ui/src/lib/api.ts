@@ -10,7 +10,8 @@ import type {
   StillFrame,
   SubtitleCue,
 } from "../types";
-import { analyzeImageFile } from "./colorAnalysis";
+import { analyzeImageFile, analyzeWaveformMatch } from "./colorAnalysis";
+import { guessMime, guessKind } from "./mime";
 import * as mediaStore from "./mediaStore";
 import * as projectStore from "./projectStore";
 import { DESKTOP_APP_HINT, invoke, isTauriApp } from "./tauri";
@@ -90,29 +91,25 @@ export const api = {
 
     const id = crypto.randomUUID();
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "mp4";
-    await mediaStore.saveBlob(id, file);
+    const mimeType = file.type || guessMime(file.name);
+    await mediaStore.saveBlob(id, file, file.name);
 
-    let durationMs = 0;
-    let width = 1920;
-    let height = 1080;
-    if (file.type.startsWith("video/")) {
-      const meta = await mediaStore.probeVideo(file);
-      durationMs = meta.durationMs;
-      width = meta.width;
-      height = meta.height;
-    }
+    const meta = await mediaStore.probeMedia(file);
+    const kind = meta.kind ?? guessKind(file.name, mimeType);
 
     const asset: MediaAsset = {
       id,
       name: file.name.replace(/\.[^.]+$/, ""),
       fileName: file.name,
       format: ext,
-      durationMs,
-      width,
-      height,
+      durationMs: meta.durationMs,
+      width: meta.width,
+      height: meta.height,
       tags: tags ?? [],
       createdAt: String(Math.floor(Date.now() / 1000)),
       blobId: id,
+      mimeType,
+      kind,
     };
 
     const clip = {
@@ -120,17 +117,17 @@ export const api = {
       trackIndex: 0,
       mediaId: id,
       startMs: 0,
-      durationMs: durationMs || 5000,
+      durationMs: meta.durationMs || 5000,
       trimInMs: 0,
-      trimOutMs: durationMs || 5000,
+      trimOutMs: meta.durationMs || 5000,
       effectIds: [] as string[],
     };
 
     let updated: Project = {
       ...project,
       media: [...project.media, asset],
-      durationMs: Math.max(project.durationMs, durationMs),
-      resolution: [width, height],
+      durationMs: Math.max(project.durationMs, meta.durationMs),
+      resolution: [meta.width, meta.height],
     };
     updated = projectStore.addClip(updated, clip);
     return { project: updated, asset };
@@ -195,6 +192,18 @@ export const api = {
 
   analyzeColorFromFile: (file: File): Promise<ColorAnalysisResult> =>
     analyzeImageFile(file),
+
+  analyzeColorWithFrame: async (
+    referenceFile: File,
+    blobId?: string,
+    timeMs = 0,
+  ): Promise<ColorAnalysisResult> => {
+    if (blobId) {
+      const sourcePixels = await mediaStore.captureVideoFrame(blobId, timeMs);
+      return analyzeWaveformMatch(referenceFile, sourcePixels);
+    }
+    return analyzeImageFile(referenceFile);
+  },
 
   analyzeColorFromPhoto: (sourcePath: string): Promise<ColorAnalysisResult> =>
     requireDesktop(() => invoke("analyze_color_from_photo", { sourcePath })),

@@ -99,7 +99,11 @@ export default function App() {
           ) : workspace === "subtitles" ? (
             <SubtitlesView project={project} onUpdate={updateProject} />
           ) : workspace === "color" ? (
-            <ColorView onApplyLut={setLutApplied} />
+            <ColorView
+              project={project}
+              positionMs={positionMs}
+              onApplyLut={setLutApplied}
+            />
           ) : workspace === "stills" ? (
             <StillsView
               project={project}

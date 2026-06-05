@@ -16,6 +16,8 @@ export interface ProjectSummary {
   updatedAt: string;
 }
 
+export type MediaKind = "video" | "image" | "audio";
+
 export interface MediaAsset {
   id: string;
   name: string;
@@ -28,6 +30,8 @@ export interface MediaAsset {
   createdAt: string;
   /** Web 端 IndexedDB blob 引用 */
   blobId?: string;
+  mimeType?: string;
+  kind?: MediaKind;
 }
 
 export interface Clip {
@@ -89,6 +93,8 @@ export interface EffectPreset {
   params: Record<string, number>;
 }
 
+export type Pixel = { r: number; g: number; b: number };
+
 export interface ColorSwatch {
   hex: string;
   weight: number;
@@ -112,11 +118,20 @@ export interface LutPreset {
   lutCube: string;
 }
 
+export interface WaveformData {
+  luma: number[];
+  r: number[];
+  g: number[];
+  b: number[];
+}
+
 export interface ColorAnalysisResult {
   dominantColors: ColorSwatch[];
   colorSystem: ColorSystem;
   suggestedLut: LutPreset;
   moodTags: string[];
+  waveform?: WaveformData;
+  matchCurves?: { luma: number[]; r: number[]; g: number[]; b: number[] };
 }
 
 export interface ExposureMetrics {

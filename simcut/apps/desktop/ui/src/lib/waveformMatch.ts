@@ -161,8 +161,14 @@ export function analyzeWithWaveformMatch(opts: WaveformMatchOptions): ColorAnaly
   const avgB = referencePixels.reduce((s, p) => s + p.b, 0) / (referencePixels.length || 1);
   const temperature = Math.max(-1, Math.min(1, (avgR - avgB) / 255));
 
-  const refLum = referencePixels.map(luma);
-  const contrast = (Math.max(...refLum) - Math.min(...refLum)) / 255;
+  let lumMin = 255;
+  let lumMax = 0;
+  for (const p of referencePixels) {
+    const y = luma(p);
+    if (y < lumMin) lumMin = y;
+    if (y > lumMax) lumMax = y;
+  }
+  const contrast = (lumMax - lumMin) / 255;
 
   let satSum = 0;
   for (const p of referencePixels) {
@@ -225,7 +231,8 @@ export function loadImagePixels(file: File): Promise<Pixel[]> {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
       const pixels: Pixel[] = [];
-      for (let i = 0; i < data.length; i += 4) {
+      const step = Math.max(4, Math.floor((canvas.width * canvas.height) / 65536) * 4);
+      for (let i = 0; i < data.length; i += step) {
         pixels.push({ r: data[i], g: data[i + 1], b: data[i + 2] });
       }
       URL.revokeObjectURL(url);

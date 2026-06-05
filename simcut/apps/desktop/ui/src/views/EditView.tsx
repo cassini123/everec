@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Film, Image, Upload, Video } from "lucide-react";
+import { Camera, Film, Image, Upload, Video } from "lucide-react";
+import { AspectRatioPicker } from "../components/edit/AspectRatioPicker";
 import { MediaBin } from "../components/timeline/MediaBin";
 import { Timeline } from "../components/timeline/Timeline";
-import { api } from "../lib/api";
+import { api, formatMs } from "../lib/api";
+import { aspectCssRatio } from "../lib/aspectRatio";
+import { capturePreviewFrame } from "../lib/captureFrame";
 import { resolvePreviewKind } from "../lib/fonts";
 import { extFromName } from "../lib/mime";
 import { clipAtTime, findMedia } from "../lib/timelineEdit";
@@ -24,12 +27,14 @@ export function EditView({
   onPositionChange,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewKind, setPreviewKind] = useState<"video" | "image" | null>(null);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState("");
 
@@ -159,6 +164,45 @@ export function EditView({
     setSelectedClipId(null);
   };
 
+  const handleAspectChange = (resolution: [number, number]) => {
+    onProjectUpdate({ ...project, resolution });
+  };
+
+  const handleCaptureStill = async () => {
+    const el =
+      previewKind === "video"
+        ? videoRef.current
+        : previewKind === "image"
+          ? imageRef.current
+          : null;
+    if (!el || !previewMedia) {
+      setMessage("请先导入并预览素材");
+      return;
+    }
+    setCapturing(true);
+    setMessage("");
+    try {
+      const { dataUrl, palette } = await capturePreviewFrame(el);
+      const still = await api.addStillFrame(
+        project.id,
+        previewMedia.id,
+        positionMs,
+        `静帧 ${formatMs(positionMs)}`,
+        ["静帧"],
+        palette.length ? palette : ["#5b8def", "#f59e6c", "#3dd68c"],
+        dataUrl,
+      );
+      onProjectUpdate({ ...project, stills: [...project.stills, still] });
+      setMessage("静帧已捕捉并加入静帧库");
+    } catch (err) {
+      setMessage(String(err));
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+  const canCapture = !!previewUrl && !loadError;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="relative flex h-56 shrink-0 flex-col border-b border-sc-border bg-black">
@@ -170,6 +214,10 @@ export function EditView({
               : ""}
           </span>
           <div className="flex items-center gap-2">
+            <AspectRatioPicker
+              resolution={project.resolution}
+              onChange={handleAspectChange}
+            />
             <input
               ref={fileRef}
               type="file"
@@ -190,49 +238,67 @@ export function EditView({
           </div>
         </div>
 
-        <div className="relative flex flex-1 items-center justify-center overflow-hidden">
-          {previewUrl && previewKind === "video" ? (
-            <video
-              ref={videoRef}
-              src={previewUrl}
-              className="max-h-full max-w-full object-contain"
-              playsInline
-              muted
-              preload="auto"
-              onTimeUpdate={handleTimeUpdate}
-              onCanPlay={() => setLoadError("")}
-              onError={() =>
-                setLoadError("视频解码失败，请转为 H.264 MP4")
-              }
-              onEnded={() => onPositionChange(activeClip?.startMs ?? 0)}
-            />
-          ) : previewUrl && previewKind === "image" ? (
-            <img
-              key={previewUrl}
-              src={previewUrl}
-              alt={previewMedia?.name ?? "图片素材"}
-              className="max-h-full max-w-full object-contain"
-              onLoad={() => setLoadError("")}
-              onError={() =>
-                setLoadError("图片加载失败，请用 JPG/PNG/WebP 格式")
-              }
-            />
-          ) : loadError ? (
-            <div className="px-4 text-center text-xs text-red-300">{loadError}</div>
-          ) : (
-            <div className="text-center text-sc-muted">
-              <Film size={40} className="mx-auto opacity-20" />
-              <p className="mt-2 text-xs">支持导入图片与视频</p>
-              <div className="mt-2 flex justify-center gap-3 text-[10px]">
-                <span className="flex items-center gap-1"><Video size={10} /> MP4 MOV</span>
-                <span className="flex items-center gap-1"><Image size={10} /> JPG PNG</span>
+        <div className="relative flex flex-1 items-center justify-center overflow-hidden px-4">
+          <div
+            className="relative flex max-h-full max-w-full items-center justify-center"
+            style={{ aspectRatio: aspectCssRatio(project.resolution) }}
+          >
+            {previewUrl && previewKind === "video" ? (
+              <video
+                ref={videoRef}
+                src={previewUrl}
+                className="h-full w-full object-contain"
+                playsInline
+                muted
+                preload="auto"
+                onTimeUpdate={handleTimeUpdate}
+                onCanPlay={() => setLoadError("")}
+                onError={() => setLoadError("视频解码失败，请转为 H.264 MP4")}
+                onEnded={() => onPositionChange(activeClip?.startMs ?? 0)}
+              />
+            ) : previewUrl && previewKind === "image" ? (
+              <img
+                ref={imageRef}
+                key={previewUrl}
+                src={previewUrl}
+                alt={previewMedia?.name ?? "图片素材"}
+                className="h-full w-full object-contain"
+                onLoad={() => setLoadError("")}
+                onError={() => setLoadError("图片加载失败，请用 JPG/PNG/WebP 格式")}
+              />
+            ) : loadError ? (
+              <div className="px-4 text-center text-xs text-red-300">{loadError}</div>
+            ) : (
+              <div className="text-center text-sc-muted">
+                <Film size={40} className="mx-auto opacity-20" />
+                <p className="mt-2 text-xs">支持导入图片与视频</p>
+                <div className="mt-2 flex justify-center gap-3 text-[10px]">
+                  <span className="flex items-center gap-1">
+                    <Video size={10} /> MP4 MOV
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Image size={10} /> JPG PNG
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {canCapture && (
+              <button
+                type="button"
+                disabled={capturing}
+                onClick={handleCaptureStill}
+                title="捕捉此刻静帧"
+                className="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-sc-accent/90 text-white shadow-lg hover:bg-sc-accent disabled:opacity-50"
+              >
+                <Camera size={16} />
+              </button>
+            )}
+          </div>
         </div>
 
         {message && !loadError && (
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-sc-panel/90 px-3 py-1 text-[10px] text-sc-muted">
+          <div className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded bg-sc-panel/90 px-3 py-1 text-[10px] text-sc-muted">
             {message}
           </div>
         )}

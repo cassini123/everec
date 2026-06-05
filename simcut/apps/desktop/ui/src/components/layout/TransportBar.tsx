@@ -6,6 +6,7 @@ interface Props {
   positionMs: number;
   durationMs: number;
   onPlay: () => void;
+  onPause: () => void;
   onStop: () => void;
   onExport: () => void;
 }
@@ -15,6 +16,7 @@ export function TransportBar({
   positionMs,
   durationMs,
   onPlay,
+  onPause,
   onStop,
   onExport,
 }: Props) {
@@ -23,8 +25,9 @@ export function TransportBar({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={playing ? onStop : onPlay}
+          onClick={playing ? onPause : onPlay}
           className="flex h-8 w-8 items-center justify-center rounded-full bg-sc-accent text-white hover:bg-sc-accent-dim"
+          title={playing ? "暂停 (空格)" : "播放 (空格)"}
         >
           {playing ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
         </button>

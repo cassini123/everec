@@ -14,6 +14,14 @@ import { AiView } from "./views/AiView";
 import { api } from "./lib/api";
 import type { Project, ProjectSummary, Workspace } from "./types";
 
+const SEEK_STEP_MS = 500;
+
+function isTypingTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+}
+
 export default function App() {
   const [workspace, setWorkspace] = useState<Workspace>("projects");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -45,6 +53,41 @@ export default function App() {
   useEffect(() => {
     refreshProjects().finally(() => setReady(true));
   }, [refreshProjects]);
+
+  const seekBy = useCallback(
+    (deltaMs: number) => {
+      const max = project?.durationMs ?? 0;
+      setPositionMs((ms) => Math.max(0, Math.min(max, ms + deltaMs)));
+    },
+    [project?.durationMs],
+  );
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!project || workspace === "projects") return;
+      if (isTypingTarget(e.target)) return;
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        setPlaying((p) => !p);
+        return;
+      }
+
+      if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        seekBy(-SEEK_STEP_MS);
+        return;
+      }
+
+      if (e.code === "ArrowRight") {
+        e.preventDefault();
+        seekBy(SEEK_STEP_MS);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [project, workspace, seekBy]);
 
   const handleSelectProject = (p: Project) => {
     setProject(p);
@@ -126,6 +169,7 @@ export default function App() {
           positionMs={positionMs}
           durationMs={project?.durationMs ?? 0}
           onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
           onStop={() => {
             setPlaying(false);
             setPositionMs(0);

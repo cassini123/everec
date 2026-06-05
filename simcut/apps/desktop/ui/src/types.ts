@@ -61,6 +61,8 @@ export interface StillFrame {
   label: string;
   tags: string[];
   colorPalette: string[];
+  /** 静帧缩略图 data URL */
+  thumbnail?: string;
 }
 
 export interface SubtitleCue {

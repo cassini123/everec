@@ -193,6 +193,7 @@ export const api = {
     label: string,
     tags: string[],
     colorPalette: string[],
+    thumbnail?: string,
   ): Promise<StillFrame> => {
     if (isTauriApp()) {
       return invoke("add_still_frame", {
@@ -202,6 +203,7 @@ export const api = {
         label,
         tags,
         colorPalette,
+        thumbnail,
       });
     }
     const project = projectStore.loadProject(projectId);
@@ -212,6 +214,7 @@ export const api = {
       label,
       tags,
       colorPalette,
+      thumbnail,
     };
     projectStore.addStill(project, still);
     return Promise.resolve(still);

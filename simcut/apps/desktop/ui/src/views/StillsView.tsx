@@ -75,8 +75,16 @@ export function StillsView({ project, positionMs, onUpdate }: Props) {
             key={still.id}
             className="rounded-xl border border-sc-border bg-sc-panel p-3"
           >
-            <div className="mb-2 flex h-24 items-center justify-center rounded-lg bg-sc-track text-sc-muted">
-              <Bookmark size={24} className="opacity-30" />
+            <div className="mb-2 flex h-24 items-center justify-center overflow-hidden rounded-lg bg-sc-track text-sc-muted">
+              {still.thumbnail ? (
+                <img
+                  src={still.thumbnail}
+                  alt={still.label}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <Bookmark size={24} className="opacity-30" />
+              )}
             </div>
             <div className="text-sm font-medium">{still.label}</div>
             <div className="mt-1 font-mono text-[10px] text-sc-muted">

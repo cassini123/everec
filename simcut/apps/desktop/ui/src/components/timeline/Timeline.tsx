@@ -1,6 +1,11 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { formatTimecode } from "../../lib/timecode";
+import {
+  msFromTimelineX,
+  pxFromMs,
+  timelineWidthPx,
+} from "../../lib/timelineLayout";
 import { findMedia, snapMs } from "../../lib/timelineEdit";
 import type { Clip, Project } from "../../types";
 import { TimecodeRuler } from "./TimecodeRuler";
@@ -30,6 +35,8 @@ export function Timeline({
 }: Props) {
   const fps = project.fps || 30;
   const duration = Math.max(project.durationMs, 10000);
+  const widthPx = timelineWidthPx(duration);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const trackRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const dragRef = useRef<{
     clipId: string;
@@ -37,24 +44,51 @@ export function Timeline({
     startX: number;
     origStart: number;
     origDuration: number;
-    trackWidth: number;
+    scrollLeft: number;
   } | null>(null);
   const [dragOverTrack, setDragOverTrack] = useState<number | null>(null);
 
-  const msFromX = useCallback(
-    (trackEl: HTMLDivElement, clientX: number) => {
-      const rect = trackEl.getBoundingClientRect();
-      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      return snapMs(ratio * duration);
+  const msFromClientX = useCallback(
+    (clientX: number) => {
+      const scroll = scrollRef.current;
+      if (!scroll) return 0;
+      const rect = scroll.getBoundingClientRect();
+      return snapMs(msFromTimelineX(scroll.scrollLeft, clientX, rect.left));
     },
-    [duration],
+    [],
   );
+
+  const scrollPlayheadIntoView = useCallback(() => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    const playheadPx = pxFromMs(positionMs);
+    const viewStart = scroll.scrollLeft;
+    const viewEnd = viewStart + scroll.clientWidth;
+    const margin = 80;
+    if (playheadPx < viewStart + margin) {
+      scroll.scrollLeft = Math.max(0, playheadPx - margin);
+    } else if (playheadPx > viewEnd - margin) {
+      scroll.scrollLeft = playheadPx - scroll.clientWidth + margin;
+    }
+  }, [positionMs]);
+
+  useEffect(() => {
+    scrollPlayheadIntoView();
+  }, [positionMs, scrollPlayheadIntoView]);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (delta === 0) return;
+    e.preventDefault();
+    scroll.scrollLeft += delta;
+  };
 
   const handlePointerDown = (
     e: React.PointerEvent,
     clip: Clip,
     mode: DragMode,
-    trackEl: HTMLDivElement,
   ) => {
     e.stopPropagation();
     e.preventDefault();
@@ -66,15 +100,17 @@ export function Timeline({
       startX: e.clientX,
       origStart: clip.startMs,
       origDuration: clip.durationMs,
-      trackWidth: trackEl.getBoundingClientRect().width,
+      scrollLeft: scrollRef.current?.scrollLeft ?? 0,
     };
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     const drag = dragRef.current;
     if (!drag) return;
-    const deltaPx = e.clientX - drag.startX;
-    const deltaMs = (deltaPx / drag.trackWidth) * duration;
+    const scroll = scrollRef.current;
+    const scrollDelta = (scroll?.scrollLeft ?? 0) - drag.scrollLeft;
+    const deltaPx = e.clientX - drag.startX + scrollDelta;
+    const deltaMs = (deltaPx / timelineWidthPx(duration)) * duration;
 
     if (drag.mode === "move") {
       onUpdateClip(drag.clipId, {
@@ -92,9 +128,9 @@ export function Timeline({
     dragRef.current = null;
   };
 
-  const handleTrackClick = (e: React.MouseEvent, trackEl: HTMLDivElement) => {
+  const handleTrackClick = (e: React.MouseEvent) => {
     if (dragRef.current) return;
-    onSeek(msFromX(trackEl, e.clientX));
+    onSeek(msFromClientX(e.clientX));
     onSelectClip(null);
   };
 
@@ -104,121 +140,119 @@ export function Timeline({
     setDragOverTrack(trackIndex);
   };
 
-  const handleDrop = (e: React.DragEvent, trackIndex: number, trackEl: HTMLDivElement) => {
+  const handleDrop = (e: React.DragEvent, trackIndex: number) => {
     e.preventDefault();
     setDragOverTrack(null);
     const mediaId = e.dataTransfer.getData("simcut/media-id");
     if (!mediaId) return;
-    onDropMedia(mediaId, trackIndex, msFromX(trackEl, e.clientX));
+    onDropMedia(mediaId, trackIndex, msFromClientX(e.clientX));
   };
 
-  const playheadPct = (positionMs / duration) * 100;
+  const playheadPx = pxFromMs(positionMs);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-sc-track">
-      <div className="relative min-h-0 flex-1 overflow-auto p-3">
-        <TimecodeRuler
-          durationMs={duration}
-          positionMs={positionMs}
-          fps={fps}
-          onSeek={onSeek}
-        />
+      <div
+        ref={scrollRef}
+        className="relative min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-3"
+        onWheel={handleWheel}
+      >
+        <div className="relative" style={{ width: widthPx, minWidth: "100%" }}>
+          <TimecodeRuler
+            durationMs={duration}
+            positionMs={positionMs}
+            fps={fps}
+            widthPx={widthPx}
+            onSeek={onSeek}
+          />
 
-        {selectedClipId && (
-          <div className="mb-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onRemoveClip(selectedClipId)}
-              className="flex items-center gap-1 rounded bg-red-950/40 px-2 py-1 text-[10px] text-red-300 hover:bg-red-950/60"
-            >
-              <Trash2 size={10} />
-              删除片段
-            </button>
-            <span className="text-[10px] text-sc-muted">拖移片段 · 拖右边缘裁剪</span>
-          </div>
-        )}
-
-        {project.tracks.map((track) => (
-          <div key={track.index} className="mb-2">
-            <div className="mb-1 flex items-center gap-2 text-[10px] text-sc-muted">
-              <span className="w-14 truncate">{track.name}</span>
-              <span className="rounded bg-sc-panel px-1.5 py-0.5 uppercase">{track.kind}</span>
+          {selectedClipId && (
+            <div className="mb-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onRemoveClip(selectedClipId)}
+                className="flex items-center gap-1 rounded bg-red-950/40 px-2 py-1 text-[10px] text-red-300 hover:bg-red-950/60"
+              >
+                <Trash2 size={10} />
+                删除片段
+              </button>
+              <span className="text-[10px] text-sc-muted">
+                拖移片段 · 拖右边缘裁剪 · 触控板左右滑动浏览
+              </span>
             </div>
-            <div
-              ref={(el) => {
-                if (el) trackRefs.current.set(track.index, el);
-              }}
-              className={`relative ml-0 h-12 rounded-md border bg-sc-panel/50 transition-colors ${
-                dragOverTrack === track.index
-                  ? "border-sc-accent bg-sc-accent/5"
-                  : "border-sc-border"
-              }`}
-              onClick={(e) => {
-                const el = trackRefs.current.get(track.index);
-                if (el) handleTrackClick(e, el);
-              }}
-              onDragOver={(e) => handleDragOver(e, track.index)}
-              onDragLeave={() => setDragOverTrack(null)}
-              onDrop={(e) => {
-                const el = trackRefs.current.get(track.index);
-                if (el) handleDrop(e, track.index, el);
-              }}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-            >
-              {track.clips.map((clip) => {
-                const left = (clip.startMs / duration) * 100;
-                const width = (clip.durationMs / duration) * 100;
-                const media = findMedia(project, clip.mediaId);
-                const selected = clip.id === selectedClipId;
-                return (
-                  <div
-                    key={clip.id}
-                    className={`timeline-clip absolute top-1 bottom-1 flex items-center overflow-hidden rounded text-[10px] text-white/90 ${
-                      selected ? "ring-2 ring-sc-warm" : ""
-                    }`}
-                    style={{ left: `${left}%`, width: `${Math.max(width, 3)}%` }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectClip(clip.id);
-                      onSeek(clip.startMs);
-                    }}
-                  >
+          )}
+
+          {project.tracks.map((track) => (
+            <div key={track.index} className="mb-2">
+              <div className="mb-1 flex items-center gap-2 text-[10px] text-sc-muted">
+                <span className="w-14 truncate">{track.name}</span>
+                <span className="rounded bg-sc-panel px-1.5 py-0.5 uppercase">{track.kind}</span>
+              </div>
+              <div
+                ref={(el) => {
+                  if (el) trackRefs.current.set(track.index, el);
+                }}
+                className={`relative h-12 rounded-md border bg-sc-panel/50 transition-colors ${
+                  dragOverTrack === track.index
+                    ? "border-sc-accent bg-sc-accent/5"
+                    : "border-sc-border"
+                }`}
+                style={{ width: widthPx }}
+                onClick={handleTrackClick}
+                onDragOver={(e) => handleDragOver(e, track.index)}
+                onDragLeave={() => setDragOverTrack(null)}
+                onDrop={(e) => handleDrop(e, track.index)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+              >
+                {track.clips.map((clip) => {
+                  const left = pxFromMs(clip.startMs);
+                  const width = pxFromMs(clip.durationMs);
+                  const media = findMedia(project, clip.mediaId);
+                  const selected = clip.id === selectedClipId;
+                  return (
                     <div
-                      className="flex h-full min-w-0 flex-1 cursor-grab flex-col justify-center px-1.5 active:cursor-grabbing"
-                      onPointerDown={(e) => {
-                        const el = trackRefs.current.get(track.index);
-                        if (el) handlePointerDown(e, clip, "move", el);
+                      key={clip.id}
+                      className={`timeline-clip absolute top-1 bottom-1 flex items-center overflow-hidden rounded text-[10px] text-white/90 ${
+                        selected ? "ring-2 ring-sc-warm" : ""
+                      }`}
+                      style={{ left, width: Math.max(width, 24) }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectClip(clip.id);
+                        onSeek(clip.startMs);
                       }}
                     >
-                      <span className="truncate">{media?.name ?? "片段"}</span>
-                      <span className="font-mono text-[8px] opacity-70">
-                        {formatTimecode(clip.startMs, fps)}
-                      </span>
+                      <div
+                        className="flex h-full min-w-0 flex-1 cursor-grab flex-col justify-center px-1.5 active:cursor-grabbing"
+                        onPointerDown={(e) => handlePointerDown(e, clip, "move")}
+                      >
+                        <span className="truncate">{media?.name ?? "片段"}</span>
+                        <span className="font-mono text-[8px] opacity-70">
+                          {formatTimecode(clip.startMs, fps)}
+                        </span>
+                      </div>
+                      <div
+                        className="h-full w-2 shrink-0 cursor-ew-resize bg-white/20 hover:bg-white/40"
+                        onPointerDown={(e) => handlePointerDown(e, clip, "resize")}
+                      />
                     </div>
-                    <div
-                      className="h-full w-2 shrink-0 cursor-ew-resize bg-white/20 hover:bg-white/40"
-                      onPointerDown={(e) => {
-                        const el = trackRefs.current.get(track.index);
-                        if (el) handlePointerDown(e, clip, "resize", el);
-                      }}
-                    />
+                  );
+                })}
+                {track.clips.length === 0 && (
+                  <div className="pointer-events-none flex h-full items-center justify-center text-[10px] text-sc-muted">
+                    拖入图片/视频素材
                   </div>
-                );
-              })}
-              {track.clips.length === 0 && (
-                <div className="pointer-events-none flex h-full items-center justify-center text-[10px] text-sc-muted">
-                  拖入图片/视频素材
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        <div
-          className="pointer-events-none absolute top-12 bottom-0 z-10 w-0.5 bg-sc-warm"
-          style={{ left: `calc(${playheadPct}% + 12px)` }}
-        />
+          <div
+            className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-sc-warm"
+            style={{ left: playheadPx }}
+          />
+        </div>
       </div>
     </div>
   );

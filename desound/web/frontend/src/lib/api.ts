@@ -109,7 +109,8 @@ export const api = {
     });
   },
 
-  uploadFoleyFile: (file: File) => {
+  uploadFoleyFile: (file?: File) => {
+    if (!file) return Promise.reject(new Error("请选择文件"));
     const form = new FormData();
     form.append("file", file);
     return fetch(`${API}/library/upload-foley`, { method: "POST", body: form }).then(async (res) => {

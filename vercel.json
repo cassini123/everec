@@ -1,10 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install --prefix simcut/web/frontend",
-  "buildCommand": "npm run build --prefix simcut/web/frontend",
-  "outputDirectory": "simcut/web/frontend/dist",
-  "framework": "vite",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build:vercel-portal",
+  "outputDirectory": "portal/dist",
+  "framework": null,
+  "functions": {
+    "api/**": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/knowgo/(.*)", "destination": "/api/knowgo" },
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/apps/simcut/(.*)", "destination": "/apps/simcut/index.html" },
+    { "source": "/apps/desound/(.*)", "destination": "/apps/desound/index.html" },
+    { "source": "/apps/knowgo/(.*)", "destination": "/apps/knowgo/index.html" },
+    { "source": "/((?!api/|apps/).*)", "destination": "/index.html" }
   ]
 }

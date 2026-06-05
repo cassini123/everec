@@ -10,24 +10,41 @@
 
 ## Vercel 在线部署
 
-| 产品 | Vercel Root Directory | 构建 |
-|------|----------------------|------|
-| **Simcut** | `/`（仓库根） | 根目录 `vercel.json` |
-| **Knowgo** | **`knowgo`** | [knowgo/DEPLOY.md](knowgo/DEPLOY.md) |
+**统一部署**：仓库根目录一个 Vercel 项目即可访问全部 Web 端。
 
-### Knowgo 部署（3 步）
+| 入口 | 路径 |
+|------|------|
+| **Everec 总览** | `/` |
+| **Simcut** | `/apps/simcut/` |
+| **Desound** | `/apps/desound/` |
+| **Knowgo** | `/apps/knowgo/` |
 
-1. [Vercel New Project](https://vercel.com/new) → 导入 `cassini123/everec`
-2. **Root Directory** 设为 **`knowgo`**
-3. Deploy → 访问 `https://<项目名>.vercel.app`
+1. [Vercel New Project](https://vercel.com/new) → 导入仓库
+2. **Root Directory** 留空（仓库根 `/`）
+3. Deploy → 左侧目录切换产品
 
-验证：`curl https://<域名>/api/knowgo/health`
+验证 API：
+
+```bash
+curl https://<域名>/api/health
+curl https://<域名>/api/knowgo/health
+```
+
+> Knowgo 也可单独部署：Root Directory 设为 `knowgo`（见 [knowgo/DEPLOY.md](knowgo/DEPLOY.md)）
 
 ### Simcut Web 本地
 
 ```bash
 npm run dev:simcut
 # 或 cd simcut/web/frontend && npm install && npm run dev
+```
+
+### 统一门户本地（含左侧目录）
+
+```bash
+npm install
+npm run dev:portal
+# http://localhost:1410 — 需同时启动各产品 dev 服务以加载 iframe
 ```
 
 ### Knowgo 本地

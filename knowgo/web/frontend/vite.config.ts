@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
 export default defineConfig({
+  base: process.env.VITE_APP_BASE ?? "/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -12,7 +13,7 @@ export default defineConfig({
   },
   clearScreen: false,
   server: {
-    port: 1421,
+    port: 1422,
     strictPort: true,
     proxy: {
       "/api/knowgo": {

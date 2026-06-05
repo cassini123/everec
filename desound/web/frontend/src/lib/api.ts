@@ -74,6 +74,16 @@ export const api = {
   searchMusicOnline: (q: string, limit = 20) =>
     request<MusicSearchResult[]>(`/search/music?q=${encodeURIComponent(q)}&limit=${limit}`),
 
+  getSearchPlayUrl: (result: MusicSearchResult) => {
+    const params = new URLSearchParams({
+      resultId: result.id,
+      title: result.title,
+      artist: result.artist,
+      source: result.source,
+    });
+    return `${API}/search/play?${params.toString()}`;
+  },
+
   parseMediaUrl: (url: string) =>
     request<LinkParseResult>("/library/parse-link", {
       method: "POST",

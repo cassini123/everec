@@ -1,5 +1,6 @@
 import type { LinkParseResult, MusicSearchResult, SoundAsset } from "../types";
 import { searchMusicOnline } from "@everec/shared";
+import { resolveMusicAudioUrl } from "@everec/shared";
 import { DESKTOP_APP_HINT, invoke, isTauriApp } from "./tauri";
 
 const USER_AGENT =
@@ -116,23 +117,23 @@ export async function saveSearchResultToLibrary(result: MusicSearchResult): Prom
   const tags = ["bgm", "search", result.source];
   const sourceLabel = `search:${result.source}`;
 
-  if (result.source === "itunes" && result.previewUrl) {
-    return importViaHttp(result.previewUrl, displayName, tags, sourceLabel);
+  try {
+    const resolved = await resolveMusicAudioUrl(result);
+    return importViaHttp(resolved.url, displayName, tags, sourceLabel, resolved.referer);
+  } catch {
+    if (result.source === "itunes" && result.previewUrl) {
+      return importViaHttp(result.previewUrl, displayName, tags, sourceLabel);
+    }
   }
 
   if (result.source === "netease") {
     const songId = result.id.replace("netease:", "");
-    const url = `https://music.163.com/song/media/outer/url?id=${songId}.mp3`;
-    try {
-      return await importViaHttp(url, displayName, tags, sourceLabel, "https://music.163.com/");
-    } catch {
-      return invoke<SoundAsset>("download_media_with_ytdlp", {
-        url: `https://music.163.com/#/song?id=${songId}`,
-        name: displayName,
-        tags,
-        sourceLabel,
-      });
-    }
+    return invoke<SoundAsset>("download_media_with_ytdlp", {
+      url: `https://music.163.com/#/song?id=${songId}`,
+      name: displayName,
+      tags,
+      sourceLabel,
+    });
   }
 
   if (result.source === "qq") {
@@ -153,6 +154,16 @@ export async function saveSearchResultToLibrary(result: MusicSearchResult): Prom
     const hash = result.id.split(":")[1];
     return invoke<SoundAsset>("download_media_with_ytdlp", {
       url: `https://www.kugou.com/song/#hash=${hash}`,
+      name: displayName,
+      tags,
+      sourceLabel,
+    });
+  }
+
+  if (result.source === "bilibili") {
+    const bvid = result.id.replace("bilibili:", "");
+    return invoke<SoundAsset>("download_media_with_ytdlp", {
+      url: `https://www.bilibili.com/video/${bvid}`,
       name: displayName,
       tags,
       sourceLabel,

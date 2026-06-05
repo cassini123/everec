@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import fs from "node:fs";
 import path from "node:path";
-import { searchMusicOnline, parseMediaUrl } from "@everec/shared";
+import { searchMusicOnline, parseMediaUrl, resolveMusicAudioUrl } from "@everec/shared";
 import {
   listSounds,
   getSound,
@@ -109,54 +109,68 @@ app.post("/library/import-search", async (c) => {
   const tmp = tempDir();
 
   try {
-    if (source === "itunes" && previewUrl) {
-      const ext = previewUrl.includes(".m4a") ? "m4a" : "mp3";
+    if (previewUrl) {
+      const ext = previewUrl.includes(".m4a") || previewUrl.includes("m4s") ? "m4a" : "mp3";
       const dest = path.join(tmp, `search.${ext}`);
-      await downloadHttp(previewUrl, dest);
-      return c.json(importFile(dest, displayName, tags, "music", sourceLabel));
-    }
-    if (source === "netease") {
-      const songId = resultId.replace("netease:", "");
-      const url = `https://music.163.com/song/media/outer/url?id=${songId}.mp3`;
-      const dest = path.join(tmp, "netease.mp3");
       try {
-        await downloadHttp(url, dest, "https://music.163.com/");
+        await downloadHttp(previewUrl, dest, "https://www.bilibili.com");
         return c.json(importFile(dest, displayName, tags, "music", sourceLabel));
       } catch {
-        if (process.env.VERCEL) {
-          return c.json({ error: "Vercel 环境暂不支持网易云完整下载，请尝试 iTunes 预览" }, 400);
-        }
-        const downloaded = downloadWithYtDlp(`https://music.163.com/#/song?id=${songId}`, tmp);
-        return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
+        /* preview link expired, resolve again below */
       }
     }
-    if (source === "qq") {
-      const parts = resultId.split(":");
-      const mid = parts[2];
-      const pageUrl = mid
-        ? `https://y.qq.com/n/ryqq/song/${mid}.html`
-        : `https://y.qq.com/n/ryqq/song/${parts[1]}.html`;
-      if (process.env.VERCEL) {
-        return c.json({ error: "Vercel 环境暂不支持 QQ 音乐下载，请使用桌面端或 iTunes 预览" }, 400);
-      }
-      const downloaded = downloadWithYtDlp(pageUrl, tmp);
-      return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
-    }
-    if (source === "kugou") {
-      const parts = resultId.split(":");
-      const hash = parts[1];
-      const pageUrl = `https://www.kugou.com/song/#hash=${hash}`;
-      if (process.env.VERCEL) {
-        return c.json({ error: "Vercel 环境暂不支持酷狗音乐下载，请使用桌面端或 iTunes 预览" }, 400);
-      }
-      const downloaded = downloadWithYtDlp(pageUrl, tmp);
-      return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
-    }
-    return c.json({ error: "该歌曲暂无可用音频" }, 400);
+
+    const resolved = await resolveMusicAudioUrl({
+      id: resultId,
+      title,
+      artist,
+      album: "",
+      durationMs: 0,
+      source,
+    });
+    const dest = path.join(tmp, `search.${resolved.ext}`);
+    await downloadHttp(resolved.url, dest, resolved.referer);
+    return c.json(importFile(dest, displayName, tags, "music", sourceLabel));
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   } finally {
     cleanupTemp();
+  }
+});
+
+app.get("/search/play", async (c) => {
+  const resultId = c.req.query("resultId") ?? "";
+  const title = c.req.query("title") ?? "";
+  const artist = c.req.query("artist") ?? "";
+  const source = c.req.query("source") ?? "";
+
+  try {
+    const resolved = await resolveMusicAudioUrl({
+      id: resultId,
+      title,
+      artist,
+      album: "",
+      durationMs: 0,
+      source,
+    });
+
+    const headers: Record<string, string> = { "User-Agent": "Mozilla/5.0" };
+    if (resolved.referer) headers.Referer = resolved.referer;
+    const upstream = await fetch(resolved.url, { headers, redirect: "follow" });
+    if (!upstream.ok) return c.json({ error: `播放失败: HTTP ${upstream.status}` }, 502);
+
+    const contentType = upstream.headers.get("content-type") ?? "";
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    if (contentType.includes("text/html") || buffer.length < 2048) {
+      return c.json({ error: "播放失败: 无法获取有效音频" }, 502);
+    }
+
+    c.header("Content-Type", resolved.ext === "mp3" ? "audio/mpeg" : "audio/mp4");
+    c.header("Accept-Ranges", "bytes");
+    c.header("Cache-Control", "public, max-age=300");
+    return c.body(buffer);
+  } catch (err) {
+    return c.json({ error: String(err) }, 400);
   }
 });
 

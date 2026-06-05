@@ -2163,40 +2163,170 @@ import path2 from "node:path";
 // shared/src/constants.ts
 var USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+// shared/src/library/resolve.ts
+var BILI_REFERER = "https://www.bilibili.com";
+function stripHtml(text) {
+  return text.replace(/<[^>]+>/g, "");
+}
+async function fetchJson(url, referer) {
+  const headers = { "User-Agent": USER_AGENT };
+  if (referer) headers.Referer = referer;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(url, { headers });
+    if (res.status === 412 && attempt === 0) {
+      await new Promise((r) => setTimeout(r, 400));
+      continue;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+  throw new Error("HTTP 412");
+}
+function isRemixTitle(title) {
+  const t = title.toLowerCase();
+  return /\bdj\b/i.test(title) || /remix/i.test(title) || /\(.*版\)/.test(title) || /（.*版）/.test(title) || /live/i.test(t);
+}
+async function getBilibiliAudioUrl(bvid) {
+  const info = await fetchJson(
+    `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
+    BILI_REFERER
+  );
+  if (info.code !== 0 || !info.data?.cid) return null;
+  const play = await fetchJson(
+    `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${info.data.cid}&fnval=16&qn=0`,
+    BILI_REFERER
+  );
+  const audio = play.data?.dash?.audio?.[0];
+  return audio?.baseUrl ?? audio?.base_url ?? null;
+}
+async function findBilibiliAudio(title, artist) {
+  const queries = [`${artist} ${title}`.trim(), title.trim()].filter(Boolean);
+  const seen = /* @__PURE__ */ new Set();
+  for (const keyword of queries) {
+    const url = `https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(keyword)}&page=1`;
+    const data = await fetchJson(url, "https://search.bilibili.com");
+    for (const item of data.data?.result ?? []) {
+      const bvid = String(item.bvid ?? "");
+      if (!bvid || seen.has(bvid)) continue;
+      seen.add(bvid);
+      const rawTitle = stripHtml(String(item.title ?? ""));
+      const author = String(item.author ?? "");
+      const titleLower = title.toLowerCase();
+      const artistLower = artist.toLowerCase();
+      if (!rawTitle.toLowerCase().includes(titleLower.replace(/\s/g, ""))) continue;
+      const artistToken = artistLower.split(/[,、/]/)[0].trim().replace(/\s/g, "");
+      if (artistToken && artistToken !== "unknown") {
+        const inTitle = rawTitle.toLowerCase().replace(/\s/g, "").includes(artistToken);
+        const inAuthor = author.toLowerCase().replace(/\s/g, "").includes(artistToken);
+        if (!inTitle && !inAuthor) continue;
+      }
+      const audioUrl = await getBilibiliAudioUrl(bvid);
+      if (!audioUrl) continue;
+      const pic = item.pic ? String(item.pic) : void 0;
+      return {
+        bvid,
+        audioUrl,
+        videoTitle: rawTitle,
+        coverUrl: pic?.startsWith("//") ? `https:${pic}` : pic
+      };
+    }
+  }
+  return null;
+}
+async function resolveMusicAudioUrl(result) {
+  if (result.source === "itunes" && result.previewUrl) {
+    return { url: result.previewUrl, ext: result.previewUrl.includes(".m4a") ? "m4a" : "mp3" };
+  }
+  if (result.source === "bilibili") {
+    const bvid = result.id.replace("bilibili:", "");
+    const audioUrl = result.previewUrl ?? await getBilibiliAudioUrl(bvid);
+    if (!audioUrl) throw new Error("\u65E0\u6CD5\u89E3\u6790 Bilibili \u97F3\u9891");
+    return { url: audioUrl, referer: BILI_REFERER, ext: "m4a" };
+  }
+  const bili = await findBilibiliAudio(result.title, result.artist);
+  if (bili) {
+    return { url: bili.audioUrl, referer: BILI_REFERER, ext: "m4a" };
+  }
+  throw new Error("\u6682\u65F6\u65E0\u6CD5\u89E3\u6790\u8BE5\u6B4C\u66F2\u7684\u64AD\u653E\u5730\u5740\uFF0C\u8BF7\u6362\u4E00\u6761\u7ED3\u679C\u6216\u4E0A\u4F20\u672C\u5730\u6587\u4EF6");
+}
+async function enrichSearchResult(result, bilibiliPool = []) {
+  if (result.previewUrl || result.source === "itunes") return result;
+  if (result.source === "bilibili") {
+    const bvid = result.id.replace("bilibili:", "");
+    const audioUrl = await getBilibiliAudioUrl(bvid);
+    return audioUrl ? { ...result, previewUrl: audioUrl } : result;
+  }
+  for (const candidate of bilibiliPool) {
+    if (candidate.source !== "bilibili") continue;
+    const titleMatch = candidate.title.toLowerCase().includes(result.title.toLowerCase());
+    const artistToken = result.artist.split(/[,、/]/)[0]?.trim().toLowerCase() ?? "";
+    const artistMatch = !artistToken || candidate.title.toLowerCase().includes(artistToken) || candidate.artist.toLowerCase().includes(artistToken);
+    if (!titleMatch || !artistMatch) continue;
+    const bvid = candidate.id.replace("bilibili:", "");
+    const audioUrl = await getBilibiliAudioUrl(bvid);
+    if (audioUrl) {
+      return {
+        ...result,
+        previewUrl: audioUrl,
+        coverUrl: result.coverUrl ?? candidate.coverUrl
+      };
+    }
+  }
+  const bili = await findBilibiliAudio(result.title, result.artist);
+  if (!bili) return result;
+  return {
+    ...result,
+    previewUrl: bili.audioUrl,
+    coverUrl: result.coverUrl ?? bili.coverUrl
+  };
+}
+
 // shared/src/library/search.ts
 var KUGOU_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148";
-async function fetchJson(url, referer, userAgent = USER_AGENT) {
+async function fetchJson2(url, referer, userAgent = USER_AGENT) {
   const headers = { "User-Agent": userAgent };
   if (referer) headers.Referer = referer;
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
-function normalizeKey(title, artist) {
-  return `${title.toLowerCase().replace(/\s+/g, "")}|${artist.toLowerCase().replace(/\s+/g, "")}`;
+function stripHtml2(text) {
+  return text.replace(/<[^>]+>/g, "");
 }
-function rankResults(query, results) {
-  const q = query.trim().toLowerCase();
-  return [...results].sort((a, b) => {
-    const aTitle = a.title.toLowerCase();
-    const bTitle = b.title.toLowerCase();
-    const aExact = aTitle.includes(q) || q.includes(aTitle) ? 1 : 0;
-    const bExact = bTitle.includes(q) || q.includes(bTitle) ? 1 : 0;
-    if (aExact !== bExact) return bExact - aExact;
-    const sourceOrder = { netease: 0, qq: 1, kugou: 2, itunes: 3 };
-    return (sourceOrder[a.source] ?? 9) - (sourceOrder[b.source] ?? 9);
-  });
+function searchQueries(query) {
+  const trimmed = query.trim();
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  const queries = [trimmed];
+  if (parts.length > 1) queries.push(parts[parts.length - 1]);
+  return [...new Set(queries)];
 }
-function dedupeResults(results) {
+function dedupeById(results) {
   const seen = /* @__PURE__ */ new Set();
   const out = [];
   for (const item of results) {
-    const key = normalizeKey(item.title, item.artist);
-    if (seen.has(key)) continue;
-    seen.add(key);
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
     out.push(item);
   }
   return out;
+}
+function scoreResult(query, result) {
+  const q = query.trim().toLowerCase();
+  const title = result.title.toLowerCase();
+  const artist = result.artist.toLowerCase();
+  let score = 0;
+  if (title.includes(q) || q.includes(title)) score += 100;
+  for (const part of q.split(/\s+/)) {
+    if (part && (title.includes(part) || artist.includes(part))) score += 20;
+  }
+  if (isRemixTitle(result.title) && !/dj|版|remix|live/i.test(q)) score -= 50;
+  if (result.previewUrl) score += 15;
+  const sourceBoost = { bilibili: 8, netease: 6, qq: 5, kugou: 4, itunes: 2 };
+  score += sourceBoost[result.source] ?? 0;
+  return score;
+}
+function rankResults(query, results) {
+  return [...results].sort((a, b) => scoreResult(query, b) - scoreResult(query, a));
 }
 function detectPlatform(url) {
   const lower = url.toLowerCase();
@@ -2213,7 +2343,7 @@ function extractBvid(url) {
 }
 async function searchItunes(query, limit) {
   const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=${limit}&country=CN`;
-  const data = await fetchJson(url);
+  const data = await fetchJson2(url);
   const results = [];
   for (const item of data.results ?? []) {
     const id = String(item.trackId ?? item.collectionId ?? "");
@@ -2233,7 +2363,7 @@ async function searchItunes(query, limit) {
 }
 async function searchNetease(query, limit) {
   const url = `https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(query)}&type=1&offset=0&limit=${limit}`;
-  const data = await fetchJson(
+  const data = await fetchJson2(
     url,
     "https://music.163.com/"
   );
@@ -2257,7 +2387,7 @@ async function searchNetease(query, limit) {
 }
 async function searchQQOnce(query, limit) {
   const url = `https://c6.y.qq.com/splcloud/fcgi-bin/smartbox_new.fcg?format=json&key=${encodeURIComponent(query)}`;
-  const data = await fetchJson(url, "https://y.qq.com/");
+  const data = await fetchJson2(url, "https://y.qq.com/");
   const results = [];
   for (const item of data.data?.song?.itemlist ?? []) {
     const id = String(item.id ?? "");
@@ -2275,23 +2405,17 @@ async function searchQQOnce(query, limit) {
   }
   return results;
 }
-function searchQueries(query) {
-  const trimmed = query.trim();
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  const queries = [trimmed];
-  if (parts.length > 1) queries.push(parts[parts.length - 1]);
-  return [...new Set(queries)];
-}
 async function searchQQ(query, limit) {
+  const merged = [];
   for (const q of searchQueries(query)) {
-    const results = await searchQQOnce(q, limit);
-    if (results.length) return results;
+    merged.push(...await searchQQOnce(q, limit));
+    if (merged.length >= limit) break;
   }
-  return [];
+  return dedupeById(merged).slice(0, limit);
 }
 async function searchKugouOnce(query, limit) {
   const url = `http://mobilecdn.kugou.com/api/v3/search/song?format=json&keyword=${encodeURIComponent(query)}&page=1&pagesize=${limit}&showtype=1`;
-  const data = await fetchJson(
+  const data = await fetchJson2(
     url,
     "https://www.kugou.com/",
     KUGOU_USER_AGENT
@@ -2315,40 +2439,78 @@ async function searchKugouOnce(query, limit) {
 async function searchKugou(query, limit) {
   const merged = [];
   for (const q of searchQueries(query)) {
-    const results = await searchKugouOnce(q, limit);
-    merged.push(...results);
+    merged.push(...await searchKugouOnce(q, limit));
     if (merged.length >= limit) break;
   }
-  return dedupeResults(merged).slice(0, limit);
+  return dedupeById(merged).slice(0, limit);
+}
+async function searchBilibili(query, limit) {
+  const results = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const keyword of searchQueries(query)) {
+    const url = `https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(keyword)}&page=1`;
+    const data = await fetchJson2(
+      url,
+      "https://search.bilibili.com"
+    );
+    for (const item of data.data?.result ?? []) {
+      const bvid = String(item.bvid ?? "");
+      if (!bvid || seen.has(bvid)) continue;
+      seen.add(bvid);
+      const title = stripHtml2(String(item.title ?? ""));
+      const author = String(item.author ?? "");
+      const durationText = String(item.duration ?? "0:0");
+      const [m, s] = durationText.split(":").map(Number);
+      const durationMs = ((m || 0) * 60 + (s || 0)) * 1e3;
+      const pic = item.pic ? String(item.pic) : void 0;
+      results.push({
+        id: `bilibili:${bvid}`,
+        title,
+        artist: author,
+        album: "Bilibili",
+        durationMs,
+        coverUrl: pic?.startsWith("//") ? `https:${pic}` : pic,
+        source: "bilibili"
+      });
+      if (results.length >= limit) return results;
+    }
+  }
+  return results;
 }
 async function searchMusicOnline(query, limit = 20) {
   const q = query.trim();
   if (!q) throw new Error("\u8BF7\u8F93\u5165\u641C\u7D22\u5173\u952E\u8BCD");
-  const perSource = Math.max(3, Math.ceil(limit / 4));
-  const [netease, qq, kugou, itunes] = await Promise.all([
+  const perSource = Math.max(8, limit);
+  const [netease, qq, kugou, itunes, bilibili] = await Promise.all([
     searchNetease(q, perSource).catch(() => []),
     searchQQ(q, perSource).catch(() => []),
     searchKugou(q, perSource).catch(() => []),
-    searchItunes(q, perSource).catch(() => [])
+    searchItunes(q, perSource).catch(() => []),
+    searchBilibili(q, perSource).catch(() => [])
   ]);
-  const results = rankResults(q, dedupeResults([...netease, ...qq, ...kugou, ...itunes])).slice(
-    0,
-    limit
+  const merged = rankResults(
+    q,
+    dedupeById([...netease, ...qq, ...kugou, ...bilibili, ...itunes])
+  ).slice(0, Math.max(limit, 24));
+  const enriched = await Promise.all(
+    merged.slice(0, 8).map((item) => enrichSearchResult(item, bilibili).catch(() => item))
   );
+  const rest = merged.slice(8);
+  const results = [...enriched, ...rest];
   if (!results.length) throw new Error("\u672A\u627E\u5230\u76F8\u5173\u6B4C\u66F2");
   return results;
 }
 async function parseBilibili(url) {
   const bvid = extractBvid(url);
   if (!bvid) throw new Error("\u65E0\u6CD5\u8BC6\u522B Bilibili \u89C6\u9891\u94FE\u63A5");
-  const info = await fetchJson(
+  const info = await fetchJson2(
     `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
     "https://www.bilibili.com"
   );
   if (info.code !== 0) throw new Error(info.message ?? "Bilibili API \u9519\u8BEF");
   const data = info.data;
   const cid = Number(data.cid);
-  const play = await fetchJson(
+  const play = await fetchJson2(
     `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${cid}&fnval=16&qn=0`,
     "https://www.bilibili.com"
   );
@@ -2665,52 +2827,61 @@ app.post("/library/import-search", async (c) => {
   const sourceLabel = `search:${source}`;
   const tmp = tempDir();
   try {
-    if (source === "itunes" && previewUrl) {
-      const ext = previewUrl.includes(".m4a") ? "m4a" : "mp3";
-      const dest = path2.join(tmp, `search.${ext}`);
-      await downloadHttp(previewUrl, dest);
-      return c.json(importFile(dest, displayName, tags, "music", sourceLabel));
-    }
-    if (source === "netease") {
-      const songId = resultId.replace("netease:", "");
-      const url = `https://music.163.com/song/media/outer/url?id=${songId}.mp3`;
-      const dest = path2.join(tmp, "netease.mp3");
+    if (previewUrl) {
+      const ext = previewUrl.includes(".m4a") || previewUrl.includes("m4s") ? "m4a" : "mp3";
+      const dest2 = path2.join(tmp, `search.${ext}`);
       try {
-        await downloadHttp(url, dest, "https://music.163.com/");
-        return c.json(importFile(dest, displayName, tags, "music", sourceLabel));
+        await downloadHttp(previewUrl, dest2, "https://www.bilibili.com");
+        return c.json(importFile(dest2, displayName, tags, "music", sourceLabel));
       } catch {
-        if (process.env.VERCEL) {
-          return c.json({ error: "Vercel \u73AF\u5883\u6682\u4E0D\u652F\u6301\u7F51\u6613\u4E91\u5B8C\u6574\u4E0B\u8F7D\uFF0C\u8BF7\u5C1D\u8BD5 iTunes \u9884\u89C8" }, 400);
-        }
-        const downloaded = downloadWithYtDlp(`https://music.163.com/#/song?id=${songId}`, tmp);
-        return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
       }
     }
-    if (source === "qq") {
-      const parts = resultId.split(":");
-      const mid = parts[2];
-      const pageUrl = mid ? `https://y.qq.com/n/ryqq/song/${mid}.html` : `https://y.qq.com/n/ryqq/song/${parts[1]}.html`;
-      if (process.env.VERCEL) {
-        return c.json({ error: "Vercel \u73AF\u5883\u6682\u4E0D\u652F\u6301 QQ \u97F3\u4E50\u4E0B\u8F7D\uFF0C\u8BF7\u4F7F\u7528\u684C\u9762\u7AEF\u6216 iTunes \u9884\u89C8" }, 400);
-      }
-      const downloaded = downloadWithYtDlp(pageUrl, tmp);
-      return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
-    }
-    if (source === "kugou") {
-      const parts = resultId.split(":");
-      const hash = parts[1];
-      const pageUrl = `https://www.kugou.com/song/#hash=${hash}`;
-      if (process.env.VERCEL) {
-        return c.json({ error: "Vercel \u73AF\u5883\u6682\u4E0D\u652F\u6301\u9177\u72D7\u97F3\u4E50\u4E0B\u8F7D\uFF0C\u8BF7\u4F7F\u7528\u684C\u9762\u7AEF\u6216 iTunes \u9884\u89C8" }, 400);
-      }
-      const downloaded = downloadWithYtDlp(pageUrl, tmp);
-      return c.json(importFile(downloaded, displayName, tags, "music", sourceLabel));
-    }
-    return c.json({ error: "\u8BE5\u6B4C\u66F2\u6682\u65E0\u53EF\u7528\u97F3\u9891" }, 400);
+    const resolved = await resolveMusicAudioUrl({
+      id: resultId,
+      title,
+      artist,
+      album: "",
+      durationMs: 0,
+      source
+    });
+    const dest = path2.join(tmp, `search.${resolved.ext}`);
+    await downloadHttp(resolved.url, dest, resolved.referer);
+    return c.json(importFile(dest, displayName, tags, "music", sourceLabel));
   } catch (err) {
     return c.json({ error: String(err) }, 500);
   } finally {
     cleanupTemp();
+  }
+});
+app.get("/search/play", async (c) => {
+  const resultId = c.req.query("resultId") ?? "";
+  const title = c.req.query("title") ?? "";
+  const artist = c.req.query("artist") ?? "";
+  const source = c.req.query("source") ?? "";
+  try {
+    const resolved = await resolveMusicAudioUrl({
+      id: resultId,
+      title,
+      artist,
+      album: "",
+      durationMs: 0,
+      source
+    });
+    const headers = { "User-Agent": "Mozilla/5.0" };
+    if (resolved.referer) headers.Referer = resolved.referer;
+    const upstream = await fetch(resolved.url, { headers, redirect: "follow" });
+    if (!upstream.ok) return c.json({ error: `\u64AD\u653E\u5931\u8D25: HTTP ${upstream.status}` }, 502);
+    const contentType = upstream.headers.get("content-type") ?? "";
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    if (contentType.includes("text/html") || buffer.length < 2048) {
+      return c.json({ error: "\u64AD\u653E\u5931\u8D25: \u65E0\u6CD5\u83B7\u53D6\u6709\u6548\u97F3\u9891" }, 502);
+    }
+    c.header("Content-Type", resolved.ext === "mp3" ? "audio/mpeg" : "audio/mp4");
+    c.header("Accept-Ranges", "bytes");
+    c.header("Cache-Control", "public, max-age=300");
+    return c.body(buffer);
+  } catch (err) {
+    return c.json({ error: String(err) }, 400);
   }
 });
 app.post("/library/import-link", async (c) => {

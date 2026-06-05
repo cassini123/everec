@@ -50,6 +50,7 @@ const platformLabels: Record<string, string> = {
   xiaohongshu: "小红书",
   itunes: "iTunes",
   netease: "网易云",
+  bilibili: "Bilibili",
   qq: "QQ音乐",
   kugou: "酷狗音乐",
 };

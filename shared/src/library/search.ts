@@ -1,5 +1,6 @@
 import type { LinkParseResult, MusicSearchResult } from "../types";
 import { USER_AGENT } from "../constants";
+import { enrichSearchResult, isRemixTitle } from "./resolve";
 
 const KUGOU_USER_AGENT =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148";
@@ -12,34 +13,49 @@ async function fetchJson<T>(url: string, referer?: string, userAgent = USER_AGEN
   return res.json() as Promise<T>;
 }
 
-function normalizeKey(title: string, artist: string): string {
-  return `${title.toLowerCase().replace(/\s+/g, "")}|${artist.toLowerCase().replace(/\s+/g, "")}`;
+function stripHtml(text: string): string {
+  return text.replace(/<[^>]+>/g, "");
 }
 
-function rankResults(query: string, results: MusicSearchResult[]): MusicSearchResult[] {
-  const q = query.trim().toLowerCase();
-  return [...results].sort((a, b) => {
-    const aTitle = a.title.toLowerCase();
-    const bTitle = b.title.toLowerCase();
-    const aExact = aTitle.includes(q) || q.includes(aTitle) ? 1 : 0;
-    const bExact = bTitle.includes(q) || q.includes(bTitle) ? 1 : 0;
-    if (aExact !== bExact) return bExact - aExact;
-    const sourceOrder = { netease: 0, qq: 1, kugou: 2, itunes: 3 };
-    return (sourceOrder[a.source as keyof typeof sourceOrder] ?? 9) -
-      (sourceOrder[b.source as keyof typeof sourceOrder] ?? 9);
-  });
+function searchQueries(query: string): string[] {
+  const trimmed = query.trim();
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  const queries = [trimmed];
+  if (parts.length > 1) queries.push(parts[parts.length - 1]!);
+  return [...new Set(queries)];
 }
 
-function dedupeResults(results: MusicSearchResult[]): MusicSearchResult[] {
+function dedupeById(results: MusicSearchResult[]): MusicSearchResult[] {
   const seen = new Set<string>();
   const out: MusicSearchResult[] = [];
   for (const item of results) {
-    const key = normalizeKey(item.title, item.artist);
-    if (seen.has(key)) continue;
-    seen.add(key);
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
     out.push(item);
   }
   return out;
+}
+
+function scoreResult(query: string, result: MusicSearchResult): number {
+  const q = query.trim().toLowerCase();
+  const title = result.title.toLowerCase();
+  const artist = result.artist.toLowerCase();
+  let score = 0;
+
+  if (title.includes(q) || q.includes(title)) score += 100;
+  for (const part of q.split(/\s+/)) {
+    if (part && (title.includes(part) || artist.includes(part))) score += 20;
+  }
+  if (isRemixTitle(result.title) && !/dj|版|remix|live/i.test(q)) score -= 50;
+  if (result.previewUrl) score += 15;
+
+  const sourceBoost = { bilibili: 8, netease: 6, qq: 5, kugou: 4, itunes: 2 };
+  score += sourceBoost[result.source as keyof typeof sourceBoost] ?? 0;
+  return score;
+}
+
+function rankResults(query: string, results: MusicSearchResult[]): MusicSearchResult[] {
+  return [...results].sort((a, b) => scoreResult(query, b) - scoreResult(query, a));
 }
 
 export function detectPlatform(url: string): string | null {
@@ -127,20 +143,13 @@ async function searchQQOnce(query: string, limit: number): Promise<MusicSearchRe
   return results;
 }
 
-function searchQueries(query: string): string[] {
-  const trimmed = query.trim();
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  const queries = [trimmed];
-  if (parts.length > 1) queries.push(parts[parts.length - 1]!);
-  return [...new Set(queries)];
-}
-
 async function searchQQ(query: string, limit: number): Promise<MusicSearchResult[]> {
+  const merged: MusicSearchResult[] = [];
   for (const q of searchQueries(query)) {
-    const results = await searchQQOnce(q, limit);
-    if (results.length) return results;
+    merged.push(...(await searchQQOnce(q, limit)));
+    if (merged.length >= limit) break;
   }
-  return [];
+  return dedupeById(merged).slice(0, limit);
 }
 
 async function searchKugouOnce(query: string, limit: number): Promise<MusicSearchResult[]> {
@@ -170,27 +179,74 @@ async function searchKugouOnce(query: string, limit: number): Promise<MusicSearc
 async function searchKugou(query: string, limit: number): Promise<MusicSearchResult[]> {
   const merged: MusicSearchResult[] = [];
   for (const q of searchQueries(query)) {
-    const results = await searchKugouOnce(q, limit);
-    merged.push(...results);
+    merged.push(...(await searchKugouOnce(q, limit)));
     if (merged.length >= limit) break;
   }
-  return dedupeResults(merged).slice(0, limit);
+  return dedupeById(merged).slice(0, limit);
+}
+
+async function searchBilibili(query: string, limit: number): Promise<MusicSearchResult[]> {
+  const results: MusicSearchResult[] = [];
+  const seen = new Set<string>();
+
+  for (const keyword of searchQueries(query)) {
+    const url = `https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(keyword)}&page=1`;
+    const data = await fetchJson<{ data?: { result?: Record<string, unknown>[] } }>(
+      url,
+      "https://search.bilibili.com",
+    );
+
+    for (const item of data.data?.result ?? []) {
+      const bvid = String(item.bvid ?? "");
+      if (!bvid || seen.has(bvid)) continue;
+      seen.add(bvid);
+
+      const title = stripHtml(String(item.title ?? ""));
+      const author = String(item.author ?? "");
+      const durationText = String(item.duration ?? "0:0");
+      const [m, s] = durationText.split(":").map(Number);
+      const durationMs = ((m || 0) * 60 + (s || 0)) * 1000;
+      const pic = item.pic ? String(item.pic) : undefined;
+
+      results.push({
+        id: `bilibili:${bvid}`,
+        title,
+        artist: author,
+        album: "Bilibili",
+        durationMs,
+        coverUrl: pic?.startsWith("//") ? `https:${pic}` : pic,
+        source: "bilibili",
+      });
+      if (results.length >= limit) return results;
+    }
+  }
+
+  return results;
 }
 
 export async function searchMusicOnline(query: string, limit = 20): Promise<MusicSearchResult[]> {
   const q = query.trim();
   if (!q) throw new Error("请输入搜索关键词");
-  const perSource = Math.max(3, Math.ceil(limit / 4));
-  const [netease, qq, kugou, itunes] = await Promise.all([
+
+  const perSource = Math.max(8, limit);
+  const [netease, qq, kugou, itunes, bilibili] = await Promise.all([
     searchNetease(q, perSource).catch(() => []),
     searchQQ(q, perSource).catch(() => []),
     searchKugou(q, perSource).catch(() => []),
     searchItunes(q, perSource).catch(() => []),
+    searchBilibili(q, perSource).catch(() => []),
   ]);
-  const results = rankResults(q, dedupeResults([...netease, ...qq, ...kugou, ...itunes])).slice(
-    0,
-    limit,
+
+  const merged = rankResults(
+    q,
+    dedupeById([...netease, ...qq, ...kugou, ...bilibili, ...itunes]),
+  ).slice(0, Math.max(limit, 24));
+
+  const enriched = await Promise.all(
+    merged.slice(0, 8).map((item) => enrichSearchResult(item, bilibili).catch(() => item)),
   );
+  const rest = merged.slice(8);
+  const results = [...enriched, ...rest];
   if (!results.length) throw new Error("未找到相关歌曲");
   return results;
 }

@@ -77,8 +77,24 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
   const [searchResults, setSearchResults] = useState<MusicSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
 
-  // Link parse state
+  const previewSearchResult = async (result: MusicSearchResult) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const url = api.getSearchPlayUrl(result);
+    if (previewingId === result.id && !audio.paused) {
+      audio.pause();
+      setPreviewingId(null);
+      return;
+    }
+    setPreviewingId(result.id);
+    audio.src = url;
+    audio.play().catch(() => {
+      showToast("error", "播放失败，请尝试保存后播放或换一条结果");
+      setPreviewingId(null);
+    });
+  };
   const [linkUrl, setLinkUrl] = useState("");
   const [linkResult, setLinkResult] = useState<LinkParseResult | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -203,7 +219,14 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
             className="hidden"
             onChange={handleFileChange}
           />
-          <audio ref={audioRef} onEnded={() => setPlayingId(null)} className="hidden" />
+          <audio
+            ref={audioRef}
+            onEnded={() => {
+              setPlayingId(null);
+              setPreviewingId(null);
+            }}
+            className="hidden"
+          />
           <button
             type="button"
             onClick={handleUploadBgm}
@@ -369,7 +392,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
               </button>
             </div>
             <p className="px-4 pb-2 text-[11px] text-ds-muted">
-              同时搜索 iTunes、网易云音乐、QQ音乐、酷狗音乐
+              同时搜索 iTunes、网易云、QQ音乐、酷狗、Bilibili；播放/保存时自动解析音频直链
             </p>
 
             <div className="flex-1 overflow-auto p-4">
@@ -408,6 +431,18 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
                           <span>{formatDurationMs(result.durationMs)}</span>
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => previewSearchResult(result)}
+                        className="flex shrink-0 items-center gap-1 rounded-md border border-ds-border px-2.5 py-1.5 text-xs text-ds-text transition hover:bg-ds-bg"
+                      >
+                        {previewingId === result.id ? (
+                          <Pause className="h-3.5 w-3.5" />
+                        ) : (
+                          <Play className="h-3.5 w-3.5" />
+                        )}
+                        试听
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleSaveSearchResult(result)}

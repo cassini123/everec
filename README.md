@@ -9,6 +9,8 @@ everec/
 ├── desound/          # 音频创作工作台（已实现）
 │   ├── desktop/      # Tauri 桌面客户端（UI 在 desktop/ui）
 │   └── web/          # Web 端
+├── knowgo/           # 视觉灵感认知工作台（已实现 Web 端）
+│   └── web/          # frontend + backend
 ├── simcut/           # AI 视频剪辑（占位，尚未实现）
 ├── shared/           # 跨项目共享代码
 ├── api/              # Vercel 部署入口
@@ -21,8 +23,12 @@ everec/
 # 安装依赖（在仓库根目录）
 npm install
 
-# Web 端
+# Desound Web 端
 npm run dev:web
+
+# Knowgo Web 端
+npm run dev:knowgo
+# 前端 http://localhost:1421 · 后端 http://localhost:3002
 
 # 桌面端（正确路径）
 cd desound/desktop && npm install && npm install --prefix ui && npm run dev

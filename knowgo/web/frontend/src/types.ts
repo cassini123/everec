@@ -1,0 +1,16 @@
+export type {
+  KnowgoWorkspace,
+  KnowgoProject,
+  ProjectBrief,
+  InspirationCapture,
+  UrlParseResult,
+  ImageAnalysis,
+  VideoAnalysis,
+  StoryboardShot,
+  InspirationDocument,
+  DocumentSection,
+  StyleGuide,
+  FontRecommendation,
+  VfxRecommendation,
+  SimilarShort,
+} from "@everec/shared";

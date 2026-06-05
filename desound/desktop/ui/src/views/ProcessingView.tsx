@@ -13,6 +13,43 @@ interface ProcessingViewProps {
   onApplyPreset: (presetId: string, effects: EffectSettings) => void;
 }
 
+function EffectPreview({
+  pattern,
+  mutedSteps = [],
+  active,
+}: {
+  pattern: number[];
+  mutedSteps?: number[];
+  active: boolean;
+}) {
+  return (
+    <div className="mt-3 rounded-md border border-ds-border/70 bg-ds-bg/70 px-2 py-2">
+      <div className="flex h-10 items-end gap-1">
+        {pattern.map((level, index) => {
+          const muted = mutedSteps.includes(index);
+          return (
+            <span
+              key={`${level}-${index}`}
+              className={`sim-cut-preview-bar flex-1 rounded-sm ${
+                muted
+                  ? "bg-ds-border/70 opacity-40"
+                  : active
+                    ? "bg-ds-green"
+                    : "bg-ds-green/55"
+              }`}
+              style={{
+                height: `${Math.max(level, 8)}%`,
+                animationDelay: `${index * 55}ms`,
+                animationPlayState: active ? "running" : "paused",
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function ProcessingView({
   projects,
   activeProjectId,
@@ -34,7 +71,7 @@ export function ProcessingView({
           />
         </div>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Waves className="h-5 w-5 text-ds-blue" />
+          <Waves className="h-5 w-5 text-ds-green" />
           声音处理
         </h2>
         <p className="mt-1 text-xs text-ds-muted">
@@ -53,19 +90,29 @@ export function ProcessingView({
                 onClick={() => onApplyPreset(preset.id, preset.effects)}
                 className={`rounded-lg border p-4 text-left transition ${
                   active
-                    ? "border-ds-blue bg-ds-blue/10 ring-1 ring-ds-blue/40"
+                    ? "border-ds-green bg-ds-green/10 ring-1 ring-ds-green/40"
                     : "border-ds-border bg-ds-panel hover:border-ds-muted"
                 }`}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-2xl">{preset.icon}</span>
-                  {active && <Check className="h-4 w-4 text-ds-blue" />}
+                  {active && <Check className="h-4 w-4 text-ds-green" />}
                 </div>
-                <div className="font-medium">{preset.nameZh}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-medium">{preset.nameZh}</div>
+                  <span className="rounded bg-ds-green/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ds-green">
+                    {preset.preview.label}
+                  </span>
+                </div>
                 <div className="text-[11px] text-ds-muted">{preset.name}</div>
                 <p className="mt-2 text-xs leading-relaxed text-ds-muted">
                   {preset.description}
                 </p>
+                <EffectPreview
+                  pattern={preset.preview.pattern}
+                  mutedSteps={preset.preview.mutedSteps}
+                  active={active}
+                />
                 <div className="mt-3 flex flex-wrap gap-1 text-[10px] text-ds-muted">
                   <span className="rounded bg-ds-bg px-1.5 py-0.5">
                     混响 {preset.effects.reverb}%

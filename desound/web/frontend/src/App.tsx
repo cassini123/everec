@@ -283,7 +283,7 @@ export default function App() {
         onExport={() => {}}
       />
 
-      <div className="absolute right-4 top-14 rounded bg-ds-blue/20 px-2 py-1 text-[11px] text-ds-blue">
+      <div className="absolute right-4 top-14 rounded bg-ds-accent/20 px-2 py-1 text-[11px] text-ds-accent">
         Web 端
       </div>
 

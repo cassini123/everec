@@ -30,11 +30,11 @@ export function TopBar({ workspace, projectName, projectTags = [] }: TopBarProps
         <span className="text-xs text-ds-muted">{labels[workspace]}</span>
         {projectTags.length > 0 && (
           <div className="ml-2 flex items-center gap-1">
-            <Tag className="h-3 w-3 text-ds-purple" />
+            <Tag className="h-3 w-3 text-ds-accent" />
             {projectTags.slice(0, 3).map((t) => (
               <span
                 key={t}
-                className="rounded bg-ds-purple/15 px-1.5 py-0.5 text-[10px] text-ds-purple"
+                className="rounded bg-ds-accent/15 px-1.5 py-0.5 text-[10px] text-ds-accent"
               >
                 {t}
               </span>
@@ -52,7 +52,7 @@ export function TopBar({ workspace, projectName, projectTags = [] }: TopBarProps
           48 kHz
         </span>
         <span className="flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5 text-ds-purple" />
+          <Sparkles className="h-3.5 w-3.5 text-ds-accent" />
           v0.2
         </span>
       </div>

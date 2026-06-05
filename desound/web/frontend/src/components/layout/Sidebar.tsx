@@ -64,7 +64,7 @@ const productionItems: {
     label: "Processing",
     sub: "声音处理",
     icon: Waves,
-    color: "text-ds-blue",
+    color: "text-ds-green",
   },
 ];
 
@@ -80,7 +80,7 @@ const bottomItems: {
     label: "Design",
     sub: "AI 声音设计",
     icon: Sparkles,
-    color: "text-ds-purple",
+    color: "text-ds-accent",
   },
 ];
 

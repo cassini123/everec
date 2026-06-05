@@ -33,6 +33,7 @@ console.log("=== Everec unified Vercel build ===");
 
 run("npm run build:vercel-api");
 run("npm run build:vercel-knowgo-api");
+run("npm run build:vercel-prerector-api");
 
 run("npm run build --workspace=@simcut/web-frontend", {
   VITE_APP_BASE: "/apps/simcut/",
@@ -43,6 +44,9 @@ run("npm run build --workspace=@everec/web-frontend", {
 run("npm run build --workspace=@everec/knowgo-frontend", {
   VITE_APP_BASE: "/apps/knowgo/",
 });
+run("npm run build --workspace=@everec/prerector-frontend", {
+  VITE_APP_BASE: "/apps/prerector/",
+});
 
 run("npm run build --workspace=@everec/portal");
 
@@ -50,6 +54,7 @@ const apps = [
   { name: "simcut", src: "simcut/web/frontend/dist" },
   { name: "desound", src: "desound/web/frontend/dist" },
   { name: "knowgo", src: "knowgo/web/frontend/dist" },
+  { name: "prerector", src: "prerector/web/frontend/dist" },
 ];
 
 for (const app of apps) {
@@ -67,6 +72,13 @@ fs.mkdirSync(knowgoApiDest, { recursive: true });
 fs.copyFileSync(
   path.join(root, "knowgo/api/index.js"),
   path.join(knowgoApiDest, "index.js"),
+);
+
+const prerectorApiDest = path.join(apiDest, "prerector");
+fs.mkdirSync(prerectorApiDest, { recursive: true });
+fs.copyFileSync(
+  path.join(root, "prerector/api/index.js"),
+  path.join(prerectorApiDest, "index.js"),
 );
 
 console.log("\n=== Build complete ===");

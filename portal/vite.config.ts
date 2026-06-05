@@ -32,6 +32,15 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/apps\/knowgo/, ""),
       },
+      "/apps/prerector": {
+        target: "http://localhost:1423",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/apps\/prerector/, ""),
+      },
+      "/api/prerector": {
+        target: "http://localhost:3003",
+        changeOrigin: true,
+      },
     },
   },
   build: {

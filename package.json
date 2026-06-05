@@ -10,20 +10,26 @@
     "desound/desktop/ui",
     "simcut/web/frontend",
     "knowgo/web/frontend",
-    "knowgo/web/backend"
+    "knowgo/web/backend",
+    "prerector/web/frontend",
+    "prerector/web/backend"
   ],
   "scripts": {
     "dev:portal": "npm run dev --workspace=@everec/portal",
     "dev:web": "npm run dev --workspace=@everec/web-backend & npm run dev --workspace=@everec/web-frontend",
     "dev:knowgo": "npm run dev --workspace=@everec/knowgo-backend & npm run dev --workspace=@everec/knowgo-frontend",
     "dev:simcut": "npm run dev --workspace=@simcut/web-frontend",
+    "dev:prerector": "npm run dev --workspace=@everec/prerector-backend & npm run dev --workspace=@everec/prerector-frontend",
     "dev:desktop": "npm run dev --prefix desound/desktop",
     "build:web": "npm run build --workspace=@everec/web-frontend",
     "build:knowgo": "npm run build --workspace=@everec/knowgo-backend && npm run build --workspace=@everec/knowgo-frontend",
     "build:simcut": "npm run build --workspace=@simcut/web-frontend",
+    "build:prerector": "npm run build --workspace=@everec/prerector-frontend",
     "build:vercel-api": "node api/scripts/build-vercel-api.mjs",
     "build:vercel-knowgo-api": "node knowgo/api/scripts/build-vercel-api.mjs",
     "build:vercel-knowgo": "npm run build:vercel-knowgo-api && npm run build --workspace=@everec/knowgo-frontend",
+    "build:vercel-prerector-api": "node prerector/api/scripts/build-vercel-api.mjs",
+    "build:vercel-prerector": "npm run build:vercel-prerector-api && npm run build --workspace=@everec/prerector-frontend",
     "build:vercel-portal": "node scripts/build-vercel-portal.mjs",
     "build:vercel": "npm run build:vercel-portal",
     "build:desktop": "npm run ui:build --prefix desound/desktop"

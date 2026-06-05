@@ -13,3 +13,5 @@ export * from "./knowgo/graphSync";
 export * from "./knowgo/styleDataset";
 export * from "./knowgo/datasetSync";
 export * from "./knowgo/documentFromGraph";
+export * from "./prerector/types";
+export * from "./prerector/constants";

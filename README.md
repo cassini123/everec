@@ -7,10 +7,11 @@
 | **Simcut** | `simcut/` | 轻量视频剪辑（Web + 桌面） |
 | **desound** | `desound/` | 音频 / 音效创作 |
 | **Knowgo** | `knowgo/` | 视觉灵感认知 + Project Graph |
+| **Prerector** | `prerector/` | 协作制片（任务 / 好友 / 群聊） |
 
 ## Vercel 在线部署
 
-**统一部署**：仓库根目录一个 Vercel 项目即可访问全部 Web 端。
+**统一部署（推荐）**：仓库根目录一个 Vercel 项目即可访问全部 Web 端。
 
 | 入口 | 路径 |
 |------|------|
@@ -18,6 +19,7 @@
 | **Simcut** | `/apps/simcut/` |
 | **Desound** | `/apps/desound/` |
 | **Knowgo** | `/apps/knowgo/` |
+| **Prerector** | `/apps/prerector/` |
 
 1. [Vercel New Project](https://vercel.com/new) → 导入仓库
 2. **Root Directory** 留空（仓库根 `/`）
@@ -28,46 +30,49 @@
 ```bash
 curl https://<域名>/api/health
 curl https://<域名>/api/knowgo/health
+curl -H "X-User-Id: user-me" https://<域名>/api/prerector/health
 ```
 
-> Knowgo 也可单独部署：Root Directory 设为 `knowgo`（见 [knowgo/DEPLOY.md](knowgo/DEPLOY.md)）
+### 独立部署（可选）
 
-### Simcut Web 本地
+| 产品 | Vercel Root Directory |
+|------|----------------------|
+| **Simcut** | `/`（仓库根，见下方说明） |
+| **Knowgo** | `knowgo` — [knowgo/DEPLOY.md](knowgo/DEPLOY.md) |
+| **Prerector** | `prerector` — [prerector/README.md](prerector/README.md) |
 
-```bash
-npm run dev:simcut
-# 或 cd simcut/web/frontend && npm install && npm run dev
-```
+> 使用统一部署时无需再为各产品单独建 Vercel 项目。
 
-### 统一门户本地（含左侧目录）
-
-```bash
-npm install
-npm run dev:portal
-# http://localhost:1410 — 需同时启动各产品 dev 服务以加载 iframe
-```
-
-### Knowgo 本地
+## 本地开发
 
 ```bash
 npm install
-npm run dev:knowgo
-# http://localhost:1421 · API :3002
+
+npm run dev:portal      # 统一门户 · http://localhost:1410
+npm run dev:simcut      # Simcut Web · :1421
+npm run dev:web         # Desound Web · :1420
+npm run dev:knowgo      # Knowgo · :1422
+npm run dev:prerector   # Prerector · :1423
 ```
 
-### Desound 本地
-
-```bash
-npm run dev:web
-```
+门户 dev 模式下 iframe 需各产品 dev 服务同时运行。
 
 ## 目录结构
 
 ```text
 everec/
-├── simcut/           # 视频剪辑
-├── desound/          # 音频创作
-├── knowgo/           # 视觉灵感（独立 Vercel Web）
+├── portal/           # 统一 Web 门户（Vercel 输出）
+├── simcut/
+├── desound/
+├── knowgo/
+├── prerector/
 ├── shared/
+├── api/
 └── docs/
+```
+
+## 验证 Vercel 构建
+
+```bash
+npm run build:vercel-portal
 ```

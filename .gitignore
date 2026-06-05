@@ -4,6 +4,7 @@ dist/
 **/dist/
 api/index.js
 knowgo/api/index.js
+prerector/api/index.js
 target/
 **/target/
 .env

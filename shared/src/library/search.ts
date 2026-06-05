@@ -1,5 +1,6 @@
 import type { LinkParseResult, MusicSearchResult } from "../types";
 import { USER_AGENT } from "../constants";
+import { extractUrlFromText, parseWebUrl } from "../knowgo/urlParse";
 import {
   cleanArtist,
   cleanSongTitle,
@@ -236,8 +237,20 @@ async function parseBilibili(url: string): Promise<LinkParseResult> {
   };
 }
 
+function toLinkParseResult(parsed: Awaited<ReturnType<typeof parseWebUrl>>, originalUrl: string): LinkParseResult {
+  return {
+    platform: parsed.platform,
+    title: parsed.title,
+    author: parsed.author ?? "",
+    durationSec: parsed.durationSec ?? 0,
+    coverUrl: parsed.imageUrl,
+    audioUrl: parsed.videoUrl,
+    originalUrl: parsed.resolvedUrl ?? originalUrl,
+  };
+}
+
 export async function parseMediaUrl(url: string): Promise<LinkParseResult> {
-  const trimmed = url.trim();
+  const trimmed = extractUrlFromText(url);
   if (!trimmed) throw new Error("请输入链接");
   if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
     throw new Error("请输入有效的 http/https 链接");
@@ -248,23 +261,21 @@ export async function parseMediaUrl(url: string): Promise<LinkParseResult> {
     try {
       return await parseBilibili(trimmed);
     } catch {
-      return {
-        platform: "bilibili",
-        title: "Bilibili 视频",
-        author: "",
-        durationSec: 0,
-        originalUrl: trimmed,
-      };
+      try {
+        return toLinkParseResult(await parseWebUrl(trimmed), trimmed);
+      } catch {
+        return {
+          platform: "bilibili",
+          title: "Bilibili 视频",
+          author: "",
+          durationSec: 0,
+          originalUrl: trimmed,
+        };
+      }
     }
   }
   if (platform === "douyin" || platform === "xiaohongshu") {
-    return {
-      platform,
-      title: "待下载",
-      author: "",
-      durationSec: 0,
-      originalUrl: trimmed,
-    };
+    return toLinkParseResult(await parseWebUrl(trimmed), trimmed);
   }
   throw new Error("暂不支持该平台，目前支持: Bilibili、抖音、小红书");
 }

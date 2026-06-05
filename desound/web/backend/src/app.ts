@@ -234,9 +234,18 @@ app.post("/library/import-link", async (c) => {
       await downloadHttp(link.audioUrl, dest, "https://www.bilibili.com");
       return c.json(importFile(dest, link.title, tags, "music", sourceLabel));
     }
+    if (
+      (link.platform === "xiaohongshu" || link.platform === "douyin") &&
+      link.audioUrl?.startsWith("http")
+    ) {
+      const ext = link.audioUrl.includes(".mp4") ? "mp4" : "mp3";
+      const dest = path.join(tmp, `${link.platform}.${ext}`);
+      await downloadHttp(link.audioUrl, dest);
+      return c.json(importFile(dest, link.title, tags, "music", sourceLabel));
+    }
     if (process.env.VERCEL) {
       return c.json(
-        { error: "Vercel 环境暂不支持抖音/小红书下载，请使用 Bilibili 直链或 iTunes 搜索" },
+        { error: "未能获取可下载的媒体地址，请确认链接有效或换用 Bilibili / iTunes 搜索" },
         400,
       );
     }

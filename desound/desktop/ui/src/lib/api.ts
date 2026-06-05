@@ -1,10 +1,13 @@
 import type {
   ExportFormat,
   InstrumentInfo,
+  SfxSearchResult,
   SoundAsset,
   SoundDesignResult,
   TrackInfo,
 } from "../types";
+import { searchSfxOnline as searchSfxShared } from "@everec/shared";
+import { open } from "@tauri-apps/plugin-dialog";
 import { DESKTOP_APP_HINT, invoke, isTauriApp } from "./tauri";
 
 function requireDesktop<T>(fn: () => Promise<T>): Promise<T> {
@@ -68,6 +71,33 @@ export const api = {
 
   saveFoleySound: (name: string, presetId: string, tags?: string[]): Promise<SoundAsset> =>
     requireDesktop(() => invoke("save_foley_sound", { name, presetId, tags })),
+
+  uploadFoleyFile: async (): Promise<SoundAsset> => {
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "Audio", extensions: ["wav", "mp3", "flac", "aac", "ogg", "m4a"] }],
+    });
+    if (!path || typeof path !== "string") throw new Error("已取消选择");
+    return invoke("import_sound", {
+      sourcePath: path,
+      tags: ["foley", "import"],
+      category: "foley",
+    });
+  },
+
+  searchSfxOnline: (q: string, limit = 12): Promise<SfxSearchResult[]> =>
+    searchSfxShared(q, limit),
+
+  saveSfxResult: (result: SfxSearchResult): Promise<SoundAsset> =>
+    requireDesktop(() =>
+      invoke("import_from_http_url", {
+        url: result.previewUrl,
+        name: result.title,
+        tags: ["foley", "sfx", result.source],
+        sourceLabel: `sfx:${result.source}`,
+        referer: undefined,
+      }),
+    ),
 
   deleteSound: (id: string): Promise<void> =>
     requireDesktop(() => invoke("delete_sound", { id })),

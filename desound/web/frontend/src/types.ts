@@ -6,6 +6,7 @@ export type {
   SoundAsset,
   MusicSearchResult,
   LinkParseResult,
+  SfxSearchResult,
   FoleyPreset,
   FoleyParam,
   NoteClip,

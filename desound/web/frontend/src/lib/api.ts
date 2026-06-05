@@ -3,10 +3,18 @@ import type {
   InstrumentInfo,
   LinkParseResult,
   MusicSearchResult,
+  SfxSearchResult,
   SoundAsset,
   SoundDesignResult,
   TrackInfo,
 } from "@everec/shared";
+import { WEB_INSTRUMENTS } from "@everec/shared";
+import {
+  initWebAudio,
+  playWebNote,
+  stopAllWebNotes,
+  stopWebNote,
+} from "./webAudioEngine";
 
 const API = "/api";
 
@@ -26,22 +34,68 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+let webTracks: TrackInfo[] = [
+  {
+    index: 0,
+    name: "Track 1",
+    instrument: "grand_piano",
+    volume: 0.85,
+    pan: 0,
+    muted: false,
+    solo: false,
+  },
+];
+
 export const api = {
   isDesktop: () => false,
   isWeb: () => true,
 
-  listInstruments: (): Promise<InstrumentInfo[]> => Promise.resolve([]),
-  initAudio: (): Promise<void> => Promise.resolve(),
-  listTracks: (): Promise<TrackInfo[]> => Promise.resolve([]),
-  addTrack: (_name?: string, _instrument?: string): Promise<number> =>
-    Promise.reject(new Error("Web 端暂不支持作曲轨")),
-  setTrackInstrument: (_track?: number, _instrument?: string): Promise<void> => Promise.resolve(),
-  setTrackVolume: (_track?: number, _volume?: number): Promise<void> => Promise.resolve(),
-  setTrackLoudness: (_track?: number, _gainDb?: number): Promise<void> => Promise.resolve(),
-  noteOn: (_track?: number, _note?: number, _velocity?: number): Promise<void> =>
-    Promise.resolve(),
-  noteOff: (_track?: number, _note?: number): Promise<void> => Promise.resolve(),
-  allNotesOff: (_track?: number): Promise<void> => Promise.resolve(),
+  listInstruments: (): Promise<InstrumentInfo[]> => Promise.resolve(WEB_INSTRUMENTS),
+
+  initAudio: (): Promise<void> => initWebAudio(),
+
+  listTracks: (): Promise<TrackInfo[]> => Promise.resolve(webTracks.map((t) => ({ ...t }))),
+
+  addTrack: async (name = "Track", instrument = "grand_piano"): Promise<number> => {
+    const idx = webTracks.length;
+    webTracks = [
+      ...webTracks,
+      {
+        index: idx,
+        name: name || `Track ${idx + 1}`,
+        instrument,
+        volume: 0.85,
+        pan: 0,
+        muted: false,
+        solo: false,
+      },
+    ];
+    return idx;
+  },
+
+  setTrackInstrument: async (track: number, instrument: string): Promise<void> => {
+    webTracks = webTracks.map((t) => (t.index === track ? { ...t, instrument } : t));
+  },
+
+  setTrackVolume: async (track: number, volume: number): Promise<void> => {
+    webTracks = webTracks.map((t) => (t.index === track ? { ...t, volume } : t));
+  },
+
+  setTrackLoudness: async (): Promise<void> => Promise.resolve(),
+
+  noteOn: async (track: number, note: number, velocity = 0.85): Promise<void> => {
+    await initWebAudio();
+    const inst = webTracks[track]?.instrument ?? "grand_piano";
+    playWebNote(track, note, velocity, inst as "grand_piano");
+  },
+
+  noteOff: async (track: number, note: number): Promise<void> => {
+    stopWebNote(track, note);
+  },
+
+  allNotesOff: async (): Promise<void> => {
+    stopAllWebNotes();
+  },
 
   listLibrarySounds: () => request<SoundAsset[]>("/library/sounds"),
 
@@ -55,8 +109,23 @@ export const api = {
     });
   },
 
-  saveFoleySound: (_name?: string, _presetId?: string, _tags?: string[]): Promise<SoundAsset> =>
-    Promise.reject(new Error("Web 端暂不支持拟音保存")),
+  uploadFoleyFile: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`${API}/library/upload-foley`, { method: "POST", body: form }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "上传失败");
+      return data as SoundAsset;
+    });
+  },
+
+  saveFoleySound: async (name: string, presetId: string, tags: string[]): Promise<SoundAsset> => {
+    return request<SoundAsset>("/library/save-foley-meta", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, presetId, tags }),
+    });
+  },
 
   deleteSound: (id: string) =>
     request<{ ok: boolean }>(`/library/sounds/${id}`, { method: "DELETE" }),
@@ -73,6 +142,9 @@ export const api = {
 
   searchMusicOnline: (q: string, limit = 20) =>
     request<MusicSearchResult[]>(`/search/music?q=${encodeURIComponent(q)}&limit=${limit}`),
+
+  searchSfxOnline: (q: string, limit = 12) =>
+    request<SfxSearchResult[]>(`/search/sfx?q=${encodeURIComponent(q)}&limit=${limit}`),
 
   getSearchPlayUrl: (result: MusicSearchResult) => {
     const params = new URLSearchParams({
@@ -104,6 +176,13 @@ export const api = {
         source: result.source,
         playBvid: result.playBvid,
       }),
+    }),
+
+  saveSfxResult: (result: SfxSearchResult) =>
+    request<SoundAsset>("/library/import-sfx", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(result),
     }),
 
   saveLinkResult: (link: LinkParseResult) =>

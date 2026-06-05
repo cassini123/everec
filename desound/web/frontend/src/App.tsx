@@ -36,8 +36,8 @@ const DEFAULT_DUB: DubSettings = {
 
 export default function App() {
   const [workspace, setWorkspace] = useState<Workspace>("library");
-  const [instruments] = useState<InstrumentInfo[]>([]);
-  const [tracks] = useState<TrackInfo[]>([]);
+  const [instruments, setInstruments] = useState<InstrumentInfo[]>([]);
+  const [tracks, setTracks] = useState<TrackInfo[]>([]);
   const [sounds, setSounds] = useState<SoundAsset[]>([]);
   const [playing, setPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
@@ -58,9 +58,20 @@ export default function App() {
     }
   }, []);
 
+  const refreshTracks = useCallback(async () => {
+    try {
+      setTracks(await api.listTracks());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
+        setInstruments(await api.listInstruments());
+        await api.initAudio();
+        await refreshTracks();
         await refreshLibrary();
         setReady(true);
       } catch (err) {
@@ -68,7 +79,7 @@ export default function App() {
         setReady(true);
       }
     })();
-  }, [refreshLibrary]);
+  }, [refreshLibrary, refreshTracks]);
 
   const showBottomBar =
     workspace === "compose" ||
@@ -115,7 +126,7 @@ export default function App() {
               bpm={bpm}
               position={position}
               playing={playing}
-              onTracksChange={() => {}}
+              onTracksChange={refreshTracks}
               onExport={() => {}}
             />
           )}

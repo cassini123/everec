@@ -47,6 +47,14 @@ export interface MusicSearchResult {
   source: string;
 }
 
+export interface SfxSearchResult {
+  id: string;
+  title: string;
+  previewUrl: string;
+  source: string;
+  durationMs?: number;
+}
+
 export interface LinkParseResult {
   platform: string;
   title: string;

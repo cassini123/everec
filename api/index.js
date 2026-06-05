@@ -2445,6 +2445,124 @@ async function resolveMusicAudioUrl(result) {
   throw new Error("\u6682\u65F6\u65E0\u6CD5\u89E3\u6790\u8BE5\u6B4C\u66F2\uFF0C\u8BF7\u6362\u4E00\u6761\u7ED3\u679C\u6216\u4E0A\u4F20\u672C\u5730\u6587\u4EF6");
 }
 
+// shared/src/library/sfxSearch.ts
+var CN_QUERY_MAP = {
+  \u6811\u6728\u838E\u838E: "tree leaves rustling wind",
+  \u6811\u6728: "tree wind forest",
+  \u838E\u838E: "rustling leaves",
+  \u70B9\u8D5E: "like button click social",
+  \u70B9\u51FB: "ui click button",
+  \u6309\u94AE: "button click ui",
+  \u96E8: "rain ambience",
+  \u96F7\u58F0: "thunder",
+  \u811A\u6B65: "footsteps walking",
+  \u5F00\u95E8: "door open creak",
+  \u7206\u70B8: "explosion impact",
+  _whoosh: "whoosh swoosh"
+};
+var CURATED_SFX = [
+  {
+    id: "mixkit:like",
+    title: "\u70B9\u8D5E \xB7 \u6E05\u8106\u63D0\u793A",
+    previewUrl: "https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3",
+    source: "mixkit"
+  },
+  {
+    id: "mixkit:click",
+    title: "\u70B9\u51FB \xB7 UI \u6309\u94AE",
+    previewUrl: "https://assets.mixkit.co/active_storage/sfx/2567/2567-preview.mp3",
+    source: "mixkit"
+  },
+  {
+    id: "mixkit:wind-leaves",
+    title: "\u6811\u6728\u838E\u838E \xB7 \u98CE\u5439\u6811\u53F6",
+    previewUrl: "https://assets.mixkit.co/active_storage/sfx/1209/1209-preview.mp3",
+    source: "mixkit"
+  },
+  {
+    id: "mixkit:forest",
+    title: "\u68EE\u6797 \xB7 \u73AF\u5883\u98CE\u58F0",
+    previewUrl: "https://assets.mixkit.co/active_storage/sfx/1210/1210-preview.mp3",
+    source: "mixkit"
+  },
+  {
+    id: "mixkit:notification",
+    title: "\u901A\u77E5 \xB7 \u77ED\u4FC3\u63D0\u793A\u97F3",
+    previewUrl: "https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3",
+    source: "mixkit"
+  }
+];
+function expandQuery(query) {
+  const q = query.trim();
+  if (!q) return "";
+  for (const [cn, en] of Object.entries(CN_QUERY_MAP)) {
+    if (q.includes(cn)) return `${q} ${en}`;
+  }
+  return q;
+}
+function scoreSfx(query, item) {
+  const q = query.toLowerCase().replace(/\s/g, "");
+  const blob = `${item.title}${item.id}`.toLowerCase().replace(/\s/g, "");
+  let score = 0;
+  for (const token of query.split(/\s+/)) {
+    const t = token.trim().toLowerCase();
+    if (t.length > 1 && blob.includes(t.replace(/\s/g, ""))) score += 10;
+  }
+  if (blob.includes(q)) score += 50;
+  for (const cn of Object.keys(CN_QUERY_MAP)) {
+    if (query.includes(cn) && item.title.includes(cn.split("").slice(0, 2).join(""))) score += 20;
+  }
+  return score;
+}
+async function searchWikimedia(query, limit) {
+  const searchTerm = expandQuery(query);
+  const url = "https://commons.wikimedia.org/w/api.php?" + new URLSearchParams({
+    action: "query",
+    generator: "search",
+    gsrsearch: `filetype:audio ${searchTerm}`,
+    gsrnamespace: "6",
+    prop: "imageinfo",
+    iiprop: "url|mime|size",
+    gsrlimit: String(limit),
+    format: "json",
+    origin: "*"
+  });
+  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+  if (!res.ok) return [];
+  const data = await res.json();
+  const results = [];
+  for (const page of Object.values(data.query?.pages ?? {})) {
+    const info = page.imageinfo?.[0];
+    const fileUrl = info?.url;
+    if (!fileUrl || !info.mime?.startsWith("audio")) continue;
+    const title = (page.title ?? "Sound").replace(/^File:/, "").replace(/\.[^.]+$/, "");
+    results.push({
+      id: `wikimedia:${encodeURIComponent(title)}`,
+      title,
+      previewUrl: fileUrl,
+      source: "wikimedia"
+    });
+  }
+  return results;
+}
+async function searchSfxOnline(query, limit = 12) {
+  const q = query.trim();
+  if (!q) throw new Error("\u8BF7\u8F93\u5165\u97F3\u6548\u5173\u952E\u8BCD");
+  const curated = CURATED_SFX.filter((item) => scoreSfx(q, item) > 0 || q.length <= 4).sort((a, b) => scoreSfx(q, b) - scoreSfx(q, a));
+  const remote = await searchWikimedia(q, limit).catch(() => []);
+  const merged = [...curated, ...remote];
+  const seen = /* @__PURE__ */ new Set();
+  const unique = [];
+  for (const item of merged.sort((a, b) => scoreSfx(q, b) - scoreSfx(q, a))) {
+    if (seen.has(item.previewUrl)) continue;
+    seen.add(item.previewUrl);
+    unique.push(item);
+    if (unique.length >= limit) break;
+  }
+  if (!unique.length) throw new Error("\u672A\u627E\u5230\u76F8\u5173\u97F3\u6548\uFF0C\u8BF7\u6362\u5173\u952E\u8BCD");
+  return unique;
+}
+
 // desound/web/backend/src/library/store.ts
 import fs from "node:fs";
 import path from "node:path";
@@ -2701,8 +2819,43 @@ app.post("/library/upload", async (c) => {
       buffer,
       ext,
       path2.basename(original, path2.extname(original)),
-      ["bgm", "upload"]
+      ["bgm", "upload"],
+      "music"
     );
+    return c.json(asset);
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+app.post("/library/upload-foley", async (c) => {
+  try {
+    const body = await c.req.parseBody();
+    const file = body.file;
+    if (!file || typeof file === "string") {
+      return c.json({ error: "\u8BF7\u4E0A\u4F20\u97F3\u9891\u6587\u4EF6" }, 400);
+    }
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const original = file.name ?? "foley.mp3";
+    const ext = path2.extname(original).slice(1).toLowerCase() || "mp3";
+    const asset = importBuffer(
+      buffer,
+      ext,
+      path2.basename(original, path2.extname(original)),
+      ["foley", "import"],
+      "foley",
+      "import:foley"
+    );
+    return c.json(asset);
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+app.post("/library/save-foley-meta", async (c) => {
+  const { name, presetId, tags } = await c.req.json();
+  try {
+    const meta = JSON.stringify({ presetId, params: {}, tags: tags ?? [] });
+    const buffer = Buffer.from(meta, "utf-8");
+    const asset = importBuffer(buffer, "foley.json", name, ["foley", presetId], "foley", `foley:${presetId}`);
     return c.json(asset);
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -2822,6 +2975,31 @@ app.get("/search/music", async (c) => {
     return c.json(await searchMusicOnline(q, limit));
   } catch (err) {
     return c.json({ error: String(err) }, 400);
+  }
+});
+app.get("/search/sfx", async (c) => {
+  const q = c.req.query("q") ?? "";
+  const limit = Number(c.req.query("limit") ?? "12");
+  try {
+    return c.json(await searchSfxOnline(q, limit));
+  } catch (err) {
+    return c.json({ error: String(err) }, 400);
+  }
+});
+app.post("/library/import-sfx", async (c) => {
+  const { title, previewUrl, source } = await c.req.json();
+  const tmp = tempDir();
+  try {
+    const ext = previewUrl.includes(".wav") ? "wav" : "mp3";
+    const dest = path2.join(tmp, `sfx.${ext}`);
+    await downloadHttp(previewUrl, dest);
+    return c.json(
+      importFile(dest, title, ["foley", "sfx", source], "foley", `sfx:${source}`)
+    );
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  } finally {
+    cleanupTemp();
   }
 });
 app.post("/library/parse-link", async (c) => {

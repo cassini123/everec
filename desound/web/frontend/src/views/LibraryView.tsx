@@ -39,7 +39,7 @@ interface LibraryViewProps {
   onExport?: () => void;
 }
 
-type LibraryTab = "library" | "search" | "link";
+type MusicSubTab = "grid" | "search" | "link";
 type Category = LibraryCategory;
 type Toast = { type: "success" | "error"; message: string };
 
@@ -47,7 +47,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const [tab, setTab] = useState<LibraryTab>("library");
+  const [musicSubTab, setMusicSubTab] = useState<MusicSubTab>("grid");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category>("all");
   const [selected, setSelected] = useState<SoundAsset | null>(null);
@@ -66,9 +66,9 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
 
   const showSaveSuccess = useCallback(
     (name: string) => {
-      setTab("library");
-      setCategory("all");
-      showToast("success", `保存成功：${name} 已添加到我的素材`);
+      setCategory("music");
+      setMusicSubTab("grid");
+      showToast("success", `保存成功：${name} 已添加到素材库`);
     },
     [showToast],
   );
@@ -242,44 +242,15 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
             {importing ? "上传中…" : "上传 BGM"}
           </button>
 
-          <div className="flex rounded-md border border-ds-border p-0.5">
-            {(
-              [
-                { id: "library" as const, label: "我的素材", icon: FileAudio },
-                { id: "search" as const, label: "联网搜索", icon: Globe },
-                { id: "link" as const, label: "解析链接", icon: Link2 },
-              ] as const
-            ).map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => {
-                  setTab(id);
-                  setToast(null);
-                }}
-                className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs transition ${
-                  tab === id
-                    ? "bg-ds-accent/20 text-ds-accent"
-                    : "text-ds-muted hover:text-ds-text"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </button>
-            ))}
+          <div className="relative ml-auto flex-1 max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ds-muted" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜索素材…"
+              className="w-full rounded-md border border-ds-border bg-ds-bg py-2 pl-9 pr-3 text-sm outline-none focus:border-ds-accent"
+            />
           </div>
-
-          {tab === "library" && (
-            <div className="relative ml-auto flex-1 max-w-xs">
-              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ds-muted" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="搜索素材…"
-                className="w-full rounded-md border border-ds-border bg-ds-bg py-2 pl-9 pr-3 text-sm outline-none focus:border-ds-accent"
-              />
-            </div>
-          )}
         </div>
 
         {toast && (
@@ -299,26 +270,54 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
           </div>
         )}
 
-        {/* Tab: My Library */}
-        {tab === "library" && (
-          <>
-            <div className="flex gap-1 border-b border-ds-border px-4 py-2">
-              {LIBRARY_CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategory(cat)}
-                  className={`rounded px-3 py-1 text-xs transition ${
-                    category === cat
-                      ? "bg-ds-accent/20 text-ds-accent"
-                      : "text-ds-muted hover:text-ds-text"
-                  }`}
-                >
-                  {CATEGORY_LABELS[cat]}
-                </button>
-              ))}
-            </div>
+        <div className="flex gap-1 border-b border-ds-border px-4 py-2">
+          {LIBRARY_CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => {
+                setCategory(cat);
+                if (cat === "music") setMusicSubTab("grid");
+              }}
+              className={`rounded px-3 py-1 text-xs transition ${
+                category === cat
+                  ? "bg-ds-accent/20 text-ds-accent"
+                  : "text-ds-muted hover:text-ds-text"
+              }`}
+            >
+              {CATEGORY_LABELS[cat]}
+            </button>
+          ))}
+        </div>
 
+        {category === "music" && (
+          <div className="flex gap-1 border-b border-ds-border px-4 py-2">
+            {(
+              [
+                { id: "grid" as const, label: "素材", icon: FileAudio },
+                { id: "search" as const, label: "联网搜索", icon: Globe },
+                { id: "link" as const, label: "解析链接", icon: Link2 },
+              ] as const
+            ).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setMusicSubTab(id)}
+                className={`flex items-center gap-1.5 rounded px-3 py-1 text-xs transition ${
+                  musicSubTab === id
+                    ? "bg-ds-purple/20 text-ds-purple"
+                    : "text-ds-muted hover:text-ds-text"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {(category !== "music" || musicSubTab === "grid") && (
+          <>
             <div className="grid-bg flex-1 overflow-auto p-4">
               {filtered.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 text-ds-muted">
@@ -364,8 +363,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
           </>
         )}
 
-        {/* Tab: Online Search */}
-        {tab === "search" && (
+        {category === "music" && musicSubTab === "search" && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex gap-2 border-b border-ds-border px-4 py-3">
               <div className="relative flex-1">
@@ -463,8 +461,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
           </div>
         )}
 
-        {/* Tab: Link Parse */}
-        {tab === "link" && (
+        {category === "music" && musicSubTab === "link" && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="border-b border-ds-border px-4 py-3">
               <div className="flex gap-2">
@@ -555,7 +552,7 @@ export function LibraryView({ sounds, onRefresh, onExport }: LibraryViewProps) {
         )}
       </div>
 
-      {selected && tab === "library" && (
+      {selected && (category !== "music" || musicSubTab === "grid") && (
         <aside className="w-72 shrink-0 border-l border-ds-border bg-ds-surface">
           <div className="border-b border-ds-border px-4 py-3 text-xs font-medium uppercase tracking-wider text-ds-muted">
             Inspector

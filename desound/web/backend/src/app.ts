@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import fs from "node:fs";
 import path from "node:path";
-import { searchMusicOnline, parseMediaUrl, resolveMusicAudioUrl } from "@everec/shared";
+import { searchMusicOnline, parseMediaUrl, resolveMusicAudioUrl, searchSfxOnline } from "@everec/shared";
 import {
   listSounds,
   getSound,
@@ -88,7 +88,48 @@ app.post("/library/upload", async (c) => {
       ext,
       path.basename(original, path.extname(original)),
       ["bgm", "upload"],
+      "music",
     );
+    return c.json(asset);
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+app.post("/library/upload-foley", async (c) => {
+  try {
+    const body = await c.req.parseBody();
+    const file = body.file;
+    if (!file || typeof file === "string") {
+      return c.json({ error: "请上传音频文件" }, 400);
+    }
+    const buffer = Buffer.from(await (file as File).arrayBuffer());
+    const original = (file as File).name ?? "foley.mp3";
+    const ext = path.extname(original).slice(1).toLowerCase() || "mp3";
+    const asset = importBuffer(
+      buffer,
+      ext,
+      path.basename(original, path.extname(original)),
+      ["foley", "import"],
+      "foley",
+      "import:foley",
+    );
+    return c.json(asset);
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  }
+});
+
+app.post("/library/save-foley-meta", async (c) => {
+  const { name, presetId, tags } = await c.req.json<{
+    name: string;
+    presetId: string;
+    tags?: string[];
+  }>();
+  try {
+    const meta = JSON.stringify({ presetId, params: {}, tags: tags ?? [] });
+    const buffer = Buffer.from(meta, "utf-8");
+    const asset = importBuffer(buffer, "foley.json", name, ["foley", presetId], "foley", `foley:${presetId}`);
     return c.json(asset);
   } catch (err) {
     return c.json({ error: String(err) }, 500);
@@ -232,6 +273,38 @@ app.get("/search/music", async (c) => {
     return c.json(await searchMusicOnline(q, limit));
   } catch (err) {
     return c.json({ error: String(err) }, 400);
+  }
+});
+
+app.get("/search/sfx", async (c) => {
+  const q = c.req.query("q") ?? "";
+  const limit = Number(c.req.query("limit") ?? "12");
+  try {
+    return c.json(await searchSfxOnline(q, limit));
+  } catch (err) {
+    return c.json({ error: String(err) }, 400);
+  }
+});
+
+app.post("/library/import-sfx", async (c) => {
+  const { title, previewUrl, source } = await c.req.json<{
+    id: string;
+    title: string;
+    previewUrl: string;
+    source: string;
+  }>();
+  const tmp = tempDir();
+  try {
+    const ext = previewUrl.includes(".wav") ? "wav" : "mp3";
+    const dest = path.join(tmp, `sfx.${ext}`);
+    await downloadHttp(previewUrl, dest);
+    return c.json(
+      importFile(dest, title, ["foley", "sfx", source], "foley", `sfx:${source}`),
+    );
+  } catch (err) {
+    return c.json({ error: String(err) }, 500);
+  } finally {
+    cleanupTemp();
   }
 });
 

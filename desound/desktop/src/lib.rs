@@ -412,15 +412,20 @@ fn import_from_http_url(
     let temp_file = temp_dir.join(format!("download_{}.{}", uuid::Uuid::new_v4(), ext));
     download_http(&url, &temp_file, referer.as_deref())?;
     let mut tag_list = tags.unwrap_or_default();
-    if !tag_list.contains(&"bgm".to_string()) {
-        tag_list.push("bgm".into());
-    }
+    let category = if tag_list.iter().any(|t| t == "foley") {
+        "foley".into()
+    } else {
+        if !tag_list.contains(&"bgm".to_string()) {
+            tag_list.push("bgm".into());
+        }
+        "music".into()
+    };
     let result = import_sound_internal(
         &state.library_dir,
         &temp_file,
         name,
         Some(tag_list),
-        Some("music".into()),
+        Some(category),
         source_label.unwrap_or_else(|| "download".into()),
     );
     let _ = std::fs::remove_file(&temp_file);

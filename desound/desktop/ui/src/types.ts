@@ -57,6 +57,7 @@ export interface SoundAsset {
   category: string;
   createdAt: string;
   source: string;
+  audioUrl?: string;
 }
 
 export interface MusicSearchResult {

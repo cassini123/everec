@@ -1,0 +1,19 @@
+{
+  "name": "everec",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "web/frontend",
+    "web/backend",
+    "desktop-client/ui"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=@everec/web-backend & npm run dev --workspace=@everec/web-frontend",
+    "dev:desktop": "npm run dev --prefix desktop-client",
+    "build:web": "npm run build --workspace=@everec/web-frontend",
+    "build:desktop": "npm run ui:build --prefix desktop-client"
+  },
+  "dependencies": {
+    "hono": "^4.7.10"
+  }
+}

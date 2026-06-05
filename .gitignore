@@ -1,0 +1,12 @@
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+target/
+**/target/
+.env
+.env.*
+data/
+**/data/
+.DS_Store
+*.log

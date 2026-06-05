@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
+import { EffectPreview } from "../components/effects/EffectPreview";
 import { api } from "../lib/api";
 import {
   describeEffect,
@@ -33,7 +34,7 @@ export function EffectsView({ activeEffects, onToggle }: Props) {
           简单特效预设
         </h1>
         <p className="mt-1 text-sm text-sc-muted">
-          转场、画面与环境特效 — 适合超短篇快剪
+          转场、画面与环境特效 — 右侧可预览实际效果
         </p>
       </div>
 
@@ -46,7 +47,7 @@ export function EffectsView({ activeEffects, onToggle }: Props) {
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-sc-muted">
                 {EFFECT_CATEGORIES[category] ?? category}
               </h3>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {items.map((preset) => {
                   const active = activeEffects.includes(preset.id);
                   return (
@@ -54,16 +55,19 @@ export function EffectsView({ activeEffects, onToggle }: Props) {
                       key={preset.id}
                       type="button"
                       onClick={() => onToggle(preset.id)}
-                      className={`rounded-xl border p-4 text-left transition-colors ${
+                      className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
                         active
                           ? "border-sc-accent bg-sc-accent/10"
                           : "border-sc-border bg-sc-panel hover:border-sc-accent/40"
                       }`}
                     >
-                      <div className="text-sm font-medium">{preset.name}</div>
-                      <div className="mt-1 text-[10px] text-sc-muted">
-                        {describeEffect(preset)}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium">{preset.name}</div>
+                        <div className="mt-0.5 text-[10px] text-sc-muted">
+                          {describeEffect(preset)}
+                        </div>
                       </div>
+                      <EffectPreview effectId={preset.id} />
                     </button>
                   );
                 })}

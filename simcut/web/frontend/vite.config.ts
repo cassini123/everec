@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   clearScreen: false,
   server: {
-    port: 1421,
-    strictPort: false,
+    port: 1422,
+    strictPort: true,
   },
   build: {
     target: "es2021",

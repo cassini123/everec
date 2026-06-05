@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ev-bg: #090a0c;
+  --color-ev-surface: #111318;
+  --color-ev-panel: #181b22;
+  --color-ev-elevated: #1f2430;
+  --color-ev-border: #2a3040;
+  --color-ev-muted: #7a8294;
+  --color-ev-text: #eef0f5;
+  --color-ev-accent: #6366f1;
+  --color-ev-accent-dim: #4f46e5;
+  --color-ev-teal: #2dd4bf;
+  --color-ev-purple: #a78bfa;
+  --color-ev-orange: #fb923c;
+  --color-ev-blue: #60a5fa;
+  --color-ev-pink: #f472b6;
+  --font-sans: "Inter", "Noto Sans SC", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-ev-bg);
+  color: var(--color-ev-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3a4050;
+  border-radius: 4px;
+}
+
+.app-card-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.app-card-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(
+    600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    color-mix(in srgb, var(--glow-color, #6366f1) 15%, transparent),
+    transparent 40%
+  );
+  pointer-events: none;
+}
+
+.app-card-glow:hover::before {
+  opacity: 1;
+}
+
+.pipeline-step {
+  position: relative;
+}
+
+.pipeline-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  width: 24px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-ev-border), transparent);
+  transform: translateY(-50%);
+}
+
+.brain-pulse {
+  animation: brain-pulse 3s ease-in-out infinite;
+}
+
+@keyframes brain-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}

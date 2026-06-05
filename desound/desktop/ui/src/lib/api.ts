@@ -93,6 +93,8 @@ export const api = {
   searchSfxOnline: (q: string, limit = 12): Promise<SfxSearchResult[]> =>
     searchSfxShared(q, limit),
 
+  getSfxPreviewUrl: (result: SfxSearchResult): string => result.previewUrl,
+
   saveSfxResult: (result: SfxSearchResult): Promise<SoundAsset> =>
     requireDesktop(() =>
       invoke("import_from_http_url", {
@@ -100,7 +102,8 @@ export const api = {
         name: result.title,
         tags: ["foley", "sfx", result.source],
         sourceLabel: `sfx:${result.source}`,
-        referer: undefined,
+        referer: result.referer,
+        ext: result.fileType,
       }),
     ),
 

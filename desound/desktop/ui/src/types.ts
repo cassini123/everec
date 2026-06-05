@@ -75,6 +75,12 @@ export interface SfxSearchResult {
   title: string;
   previewUrl: string;
   source: string;
+  sourceLabel?: string;
+  sourceUrl?: string;
+  creator?: string;
+  license?: string;
+  fileType?: string;
+  referer?: string;
   durationMs?: number;
 }
 

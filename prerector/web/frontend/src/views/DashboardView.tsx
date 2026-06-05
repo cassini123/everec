@@ -7,7 +7,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { DashboardStats, PrerectorProject } from "@everec/shared";
-import { formatDue } from "../lib/api";
+import { PROJECT_TYPE_LABELS, formatDue } from "../lib/api";
 
 interface DashboardViewProps {
   stats: DashboardStats | null;
@@ -58,7 +58,7 @@ export function DashboardView({ stats, projects, loading }: DashboardViewProps) 
       <div>
         <h1 className="text-lg font-semibold text-pr-text">协作制片总览</h1>
         <p className="mt-1 text-sm text-pr-muted">
-          自动拆解任务、评估难度与时间，协调小组与视频同步
+          支持视频、设计、开发、营销等多类型项目 — 自动拆解、评估难度与工时
         </p>
       </div>
 
@@ -87,7 +87,7 @@ export function DashboardView({ stats, projects, loading }: DashboardViewProps) 
         <StatCard
           label="同步会话"
           value={stats.activeSyncSessions}
-          sub="视频文件传输中"
+          sub="文件传输中"
           icon={CloudUpload}
           color="text-pr-accent"
         />
@@ -132,12 +132,17 @@ export function DashboardView({ stats, projects, loading }: DashboardViewProps) 
                   key={p.id}
                   className="rounded-md bg-pr-elevated px-3 py-2"
                 >
-                  <div className="text-sm font-medium text-pr-text">{p.name}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-medium text-pr-text">{p.name}</div>
+                    <span className="rounded bg-pr-accent/15 px-1.5 py-0.5 text-[10px] text-pr-accent">
+                      {PROJECT_TYPE_LABELS[p.projectType ?? "general"]}
+                    </span>
+                  </div>
                   <div className="mt-0.5 line-clamp-2 text-[11px] text-pr-muted">
                     {p.brief}
                   </div>
                   <div className="mt-1 text-[10px] text-pr-muted">
-                    时长 {p.videoDurationMin} min
+                    规模 {p.scope ?? p.videoDurationMin ?? "—"} {p.scopeUnit ?? "min"}
                   </div>
                 </li>
               ))}

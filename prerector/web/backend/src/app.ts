@@ -1,10 +1,12 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type {
+  AssessTaskRequest,
   DecomposeRequest,
   TaskStatus,
   TeamMember,
 } from "@everec/shared";
+import { DIFFICULTY_LABELS } from "@everec/shared";
 import {
   assignTask,
   createReminder,
@@ -24,6 +26,9 @@ import {
   updateTaskStatus,
 } from "./store";
 import { syncStats } from "./syncEngine";
+import { assessCustomTask } from "./taskAssessment";
+import { detectProjectType } from "./taskTemplates";
+import { SCOPE_LABELS } from "@everec/shared";
 
 const app = new Hono().basePath("/api");
 
@@ -59,10 +64,34 @@ app.patch("/tasks/:id/assign", async (c) => {
 
 app.post("/tasks/decompose", async (c) => {
   const body = await c.req.json<DecomposeRequest>();
-  if (!body.brief?.trim()) {
-    return c.json({ error: "请提供项目 Brief" }, 400);
+  if (!body.brief?.trim() && !body.taskInput?.trim()) {
+    return c.json({ error: "请提供项目 Brief 或任务列表" }, 400);
   }
-  return c.json(decompose(body));
+  return c.json(decompose({ ...body, brief: body.brief?.trim() || "自定义项目" }));
+});
+
+app.post("/tasks/assess", async (c) => {
+  const body = await c.req.json<AssessTaskRequest>();
+  if (!body.title?.trim()) {
+    return c.json({ error: "请提供任务标题" }, 400);
+  }
+  const projectType = detectProjectType(body.brief ?? body.title, body.projectType);
+  const scope = body.scope ?? SCOPE_LABELS[projectType].default;
+  const { difficulty, estimatedHours } = assessCustomTask(
+    {
+      title: body.title.trim(),
+      description: body.description?.trim() || body.title.trim(),
+      phase: "执行",
+    },
+    body.brief ?? "",
+    projectType,
+    scope,
+  );
+  return c.json({
+    difficulty,
+    estimatedHours,
+    difficultyLabel: DIFFICULTY_LABELS[difficulty],
+  });
 });
 
 app.get("/teams", (c) => c.json(listTeams()));

@@ -1,4 +1,6 @@
 import type {
+  AssessTaskRequest,
+  AssessTaskResult,
   DashboardStats,
   DecomposeRequest,
   DecomposeResult,
@@ -9,6 +11,11 @@ import type {
   TaskStatus,
   Team,
   TeamMember,
+} from "@everec/shared";
+export {
+  PROJECT_TYPE_LABELS,
+  SCOPE_LABELS,
+  DIFFICULTY_LABELS,
 } from "@everec/shared";
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -42,6 +49,8 @@ export const api = {
     }),
   decompose: (body: DecomposeRequest) =>
     req<DecomposeResult>("/tasks/decompose", { method: "POST", body: JSON.stringify(body) }),
+  assessTask: (body: AssessTaskRequest) =>
+    req<AssessTaskResult>("/tasks/assess", { method: "POST", body: JSON.stringify(body) }),
   listTeams: () => req<Team[]>("/teams"),
   createTeam: (name: string, members: Omit<TeamMember, "id">[]) =>
     req<Team>("/teams", { method: "POST", body: JSON.stringify({ name, members }) }),

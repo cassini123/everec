@@ -1,7 +1,14 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Sparkles, User } from "lucide-react";
-import type { PrerectorProject, PrerectorTask, Team } from "@everec/shared";
-import { ROLE_LABELS, STATUS_LABELS, api } from "../lib/api";
+import type { PrerectorProject, PrerectorTask, ProjectType, Team, AssessTaskResult } from "@everec/shared";
+import {
+  DIFFICULTY_LABELS,
+  PROJECT_TYPE_LABELS,
+  ROLE_LABELS,
+  SCOPE_LABELS,
+  STATUS_LABELS,
+  api,
+} from "../lib/api";
 
 interface TasksViewProps {
   projects: PrerectorProject[];
@@ -12,13 +19,20 @@ interface TasksViewProps {
   onRefresh: () => Promise<void>;
 }
 
+const PROJECT_TYPES = Object.keys(PROJECT_TYPE_LABELS) as ProjectType[];
+
 function DifficultyBadge({ level }: { level: number }) {
   return (
-    <span className={`text-xs font-medium difficulty-${level}`}>
+    <span className={`text-xs font-medium difficulty-${level}`} title={DIFFICULTY_LABELS[level as 1 | 2 | 3 | 4 | 5]}>
       {"★".repeat(level)}
       <span className="text-pr-muted">{"☆".repeat(5 - level)}</span>
     </span>
   );
+}
+
+function scopeMeta(projectType: ProjectType) {
+  if (projectType === "auto") return SCOPE_LABELS.general;
+  return SCOPE_LABELS[projectType];
 }
 
 export function TasksView({
@@ -30,10 +44,61 @@ export function TasksView({
   onRefresh,
 }: TasksViewProps) {
   const [brief, setBrief] = useState("");
-  const [durationMin, setDurationMin] = useState(5);
+  const [taskInput, setTaskInput] = useState("");
+  const [projectType, setProjectType] = useState<ProjectType>("auto");
+  const [scope, setScope] = useState(SCOPE_LABELS.general.default);
   const [teamId, setTeamId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [previews, setPreviews] = useState<AssessTaskResult[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const scopeInfo = useMemo(() => scopeMeta(projectType), [projectType]);
+
+  useEffect(() => {
+    setScope(scopeInfo.default);
+  }, [scopeInfo.default]);
+
+  const taskLines = useMemo(
+    () =>
+      taskInput
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean),
+    [taskInput],
+  );
+
+  useEffect(() => {
+    if (taskLines.length === 0) {
+      setPreviews([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setPreviewLoading(true);
+      try {
+        const results = await Promise.all(
+          taskLines.map((line) => {
+            const cleaned = line.replace(/^[-*•]\s*/, "").replace(/^\d+[.)]\s*/, "");
+            const [title] = cleaned.split("|").map((s) => s.trim());
+            return api.assessTask({
+              title: title || cleaned,
+              brief,
+              projectType,
+              scope,
+            });
+          }),
+        );
+        setPreviews(results);
+      } catch {
+        setPreviews([]);
+      } finally {
+        setPreviewLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [taskLines, brief, projectType, scope]);
 
   const filtered = activeProjectId
     ? tasks.filter((t) => t.projectId === activeProjectId)
@@ -47,17 +112,21 @@ export function TasksView({
   }
 
   async function handleDecompose() {
-    if (!brief.trim()) return;
+    if (!brief.trim() && taskLines.length === 0) return;
     setLoading(true);
     setError("");
     try {
       const result = await api.decompose({
-        brief,
-        videoDurationMin: durationMin,
+        brief: brief.trim() || "自定义项目",
+        projectType,
+        scope,
+        taskInput: taskInput.trim() || undefined,
         teamId: teamId || undefined,
       });
       onProjectChange(result.project.id);
       setBrief("");
+      setTaskInput("");
+      setPreviews([]);
       await onRefresh();
     } catch (err) {
       setError(String(err));
@@ -72,32 +141,97 @@ export function TasksView({
   }
 
   const phases = [...new Set(filtered.map((t) => t.phase))];
+  const canSubmit = brief.trim() || taskLines.length > 0;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="border-b border-pr-border bg-pr-panel p-4">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-medium text-pr-text">
           <Sparkles className="h-4 w-4 text-pr-accent" />
-          自动拆解任务
+          项目任务输入与拆解
         </h2>
-        <textarea
-          value={brief}
-          onChange={(e) => setBrief(e.target.value)}
-          placeholder="输入项目 Brief，例如：60 秒产品宣传片 · 赛博朋克风格 · 需调色与字幕"
-          className="mb-3 w-full resize-none rounded-md border border-pr-border bg-pr-elevated px-3 py-2 text-sm text-pr-text placeholder:text-pr-muted focus:outline-none focus:ring-1 focus:ring-pr-accent"
-          rows={3}
-        />
+
+        <div className="mb-3 grid gap-3 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-[11px] text-pr-muted">项目 Brief</label>
+            <textarea
+              value={brief}
+              onChange={(e) => setBrief(e.target.value)}
+              placeholder="描述项目目标，例如：电商 App 改版 / 播客片头制作 / 618 营销活动"
+              className="w-full resize-none rounded-md border border-pr-border bg-pr-elevated px-3 py-2 text-sm text-pr-text placeholder:text-pr-muted focus:outline-none focus:ring-1 focus:ring-pr-accent"
+              rows={2}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-pr-muted">
+              自定义任务（每行一项，可选）
+            </label>
+            <textarea
+              value={taskInput}
+              onChange={(e) => setTaskInput(e.target.value)}
+              placeholder={"- 用户调研\n- 首页 UI 设计 | 含 dark mode\n1. 后端 API 开发"}
+              className="w-full resize-none rounded-md border border-pr-border bg-pr-elevated px-3 py-2 font-mono text-sm text-pr-text placeholder:text-pr-muted focus:outline-none focus:ring-1 focus:ring-pr-accent"
+              rows={2}
+            />
+          </div>
+        </div>
+
+        {taskLines.length > 0 && (
+          <div className="mb-3 rounded-md border border-pr-border/60 bg-pr-elevated/50 px-3 py-2">
+            <div className="mb-1 flex items-center gap-2 text-[11px] text-pr-muted">
+              难度评估预览
+              {previewLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+            </div>
+            <ul className="space-y-1">
+              {taskLines.map((line, i) => {
+                const preview = previews[i];
+                const cleaned = line.replace(/^[-*•]\s*/, "").replace(/^\d+[.)]\s*/, "");
+                const title = cleaned.split("|")[0]?.trim() ?? cleaned;
+                return (
+                  <li key={i} className="flex items-center gap-3 text-xs">
+                    <span className="min-w-0 flex-1 truncate text-pr-text">{title}</span>
+                    {preview ? (
+                      <>
+                        <DifficultyBadge level={preview.difficulty} />
+                        <span className="text-pr-orange">{preview.estimatedHours}h</span>
+                        <span className="text-pr-muted">{preview.difficultyLabel}</span>
+                      </>
+                    ) : (
+                      <span className="text-pr-muted">评估中…</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-xs text-pr-muted">
-            视频时长 (min)
+            项目类型
+            <select
+              value={projectType}
+              onChange={(e) => setProjectType(e.target.value as ProjectType)}
+              className="rounded border border-pr-border bg-pr-elevated px-2 py-1 text-sm text-pr-text"
+            >
+              {PROJECT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {PROJECT_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-pr-muted">
+            {scopeInfo.label}
             <input
               type="number"
               min={0.5}
               step={0.5}
-              value={durationMin}
-              onChange={(e) => setDurationMin(Number(e.target.value))}
+              value={scope}
+              onChange={(e) => setScope(Number(e.target.value))}
               className="w-20 rounded border border-pr-border bg-pr-elevated px-2 py-1 text-sm text-pr-text"
             />
+            <span>{scopeInfo.unit}</span>
           </label>
           <label className="flex items-center gap-2 text-xs text-pr-muted">
             分配小组
@@ -117,11 +251,11 @@ export function TasksView({
           <button
             type="button"
             onClick={handleDecompose}
-            disabled={loading || !brief.trim()}
+            disabled={loading || !canSubmit}
             className="ml-auto flex items-center gap-2 rounded-md bg-pr-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            拆解并分配
+            {taskLines.length > 0 ? "评估并创建" : "拆解并分配"}
           </button>
         </div>
         {error && <p className="mt-2 text-xs text-pr-red">{error}</p>}
@@ -150,7 +284,9 @@ export function TasksView({
 
       <div className="flex-1 overflow-auto p-4">
         {filtered.length === 0 ? (
-          <p className="text-center text-sm text-pr-muted">输入 Brief 开始自动拆解</p>
+          <p className="text-center text-sm text-pr-muted">
+            输入 Brief 或自定义任务列表，系统将自动评估难度与工时
+          </p>
         ) : (
           phases.map((phase) => (
             <section key={phase} className="mb-6">

@@ -34,10 +34,22 @@ function emptyStore(): StoreData {
   return { projects: [], tasks: [], teams: [], syncSessions: [], reminders: [] };
 }
 
+function migrateStore(data: StoreData): StoreData {
+  return {
+    ...data,
+    projects: data.projects.map((p) => ({
+      ...p,
+      projectType: p.projectType ?? "video",
+      scope: p.scope ?? p.videoDurationMin ?? 5,
+      scopeUnit: p.scopeUnit ?? "min",
+    })),
+  };
+}
+
 function load(): StoreData {
   try {
     if (fs.existsSync(STORE_FILE)) {
-      return JSON.parse(fs.readFileSync(STORE_FILE, "utf-8")) as StoreData;
+      return migrateStore(JSON.parse(fs.readFileSync(STORE_FILE, "utf-8")) as StoreData);
     }
   } catch {
     /* fresh store */
@@ -67,7 +79,8 @@ function seedDemo(): StoreData {
   const result = decomposeProject(
     {
       brief: "30 秒品牌宣传片 · A24 风格 · 4K 交付",
-      videoDurationMin: 0.5,
+      projectType: "video",
+      scope: 0.5,
       teamId: team.id,
     },
     team,

@@ -9,6 +9,15 @@ export type TaskStatus = "todo" | "in_progress" | "review" | "done";
 export type TaskDifficulty = 1 | 2 | 3 | 4 | 5;
 export type MemberRole = "director" | "editor" | "colorist" | "sound" | "producer" | "other";
 
+export type ProjectType =
+  | "auto"
+  | "video"
+  | "audio"
+  | "design"
+  | "software"
+  | "campaign"
+  | "general";
+
 export interface TeamMember {
   id: string;
   name: string;
@@ -42,9 +51,13 @@ export interface PrerectorProject {
   id: string;
   name: string;
   brief: string;
-  videoDurationMin: number;
+  projectType: Exclude<ProjectType, "auto">;
+  scope: number;
+  scopeUnit: string;
   teamId?: string;
   createdAt: string;
+  /** @deprecated use scope */
+  videoDurationMin?: number;
 }
 
 export type SyncPriority = "proxy" | "timeline" | "raw";
@@ -84,13 +97,32 @@ export interface Reminder {
 
 export interface DecomposeRequest {
   brief: string;
-  videoDurationMin?: number;
+  projectType?: ProjectType;
+  scope?: number;
+  /** 自定义任务列表，每行一项，支持 `- 任务` 或 `任务 | 描述` */
+  taskInput?: string;
   teamId?: string;
+  /** @deprecated use scope */
+  videoDurationMin?: number;
 }
 
 export interface DecomposeResult {
   project: PrerectorProject;
   tasks: PrerectorTask[];
+}
+
+export interface AssessTaskRequest {
+  title: string;
+  description?: string;
+  brief?: string;
+  projectType?: ProjectType;
+  scope?: number;
+}
+
+export interface AssessTaskResult {
+  difficulty: TaskDifficulty;
+  estimatedHours: number;
+  difficultyLabel: string;
 }
 
 export interface DashboardStats {

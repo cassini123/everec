@@ -5,3 +5,4 @@ export * from "./library/resolve";
 export * from "./library/sfxSearch";
 export * from "./instruments/webInstruments";
 export * from "./prerector/types";
+export * from "./prerector/constants";

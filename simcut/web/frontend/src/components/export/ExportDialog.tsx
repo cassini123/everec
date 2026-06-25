@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Cloud, Image, X } from "lucide-react";
 import { api } from "../../lib/api";
+import { isTauriApp } from "../../lib/tauri";
 import type { ExportOptions } from "../../types";
 
 interface Props {
@@ -17,6 +18,7 @@ export function ExportDialog({ open, projectId, onClose }: Props) {
   const [uploadCloud, setUploadCloud] = useState(false);
   const [cloudProvider, setCloudProvider] = useState("iCloud");
   const [status, setStatus] = useState("");
+  const [outputPath, setOutputPath] = useState("");
   const [busy, setBusy] = useState(false);
 
   if (!open) return null;
@@ -25,6 +27,7 @@ export function ExportDialog({ open, projectId, onClose }: Props) {
     if (!projectId) return;
     setBusy(true);
     setStatus("渲染中…");
+    setOutputPath("");
     try {
       const options: ExportOptions = {
         format,
@@ -36,6 +39,9 @@ export function ExportDialog({ open, projectId, onClose }: Props) {
       };
       const result = await api.exportProject(projectId, options);
       setStatus(result.message);
+      if (result.success && result.outputPath) {
+        setOutputPath(result.outputPath);
+      }
     } catch (err) {
       setStatus(String(err));
     } finally {
@@ -129,6 +135,16 @@ export function ExportDialog({ open, projectId, onClose }: Props) {
 
           {status && (
             <p className="rounded-lg bg-sc-panel px-3 py-2 text-xs text-sc-muted">{status}</p>
+          )}
+
+          {outputPath && isTauriApp() && (
+            <button
+              type="button"
+              onClick={() => api.openExportFolder(outputPath)}
+              className="w-full rounded-lg border border-sc-border py-2 text-sm text-sc-accent hover:bg-sc-panel"
+            >
+              打开导出文件夹
+            </button>
           )}
 
           <button

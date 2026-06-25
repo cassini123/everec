@@ -5,7 +5,7 @@ mod project_service;
 use std::path::PathBuf;
 
 use color_engine::{analyze_image_path, ColorAnalysisResult};
-use export_service::{render_project, save_to_photos, upload_to_cloud, ExportOptions, ExportResult};
+use crate::export_service::{render_project, save_to_photos, upload_to_cloud, ExportOptions, ExportResult};
 use project_service::{ProjectService, ProjectSummary};
 use timeline_engine::{
     default_effect_presets, EffectPreset, Project, StillFrame, SubtitleCue,
@@ -15,6 +15,40 @@ use tauri::{Manager, State};
 
 pub struct AppState {
     pub projects: ProjectService,
+}
+
+#[tauri::command]
+fn get_media_path(state: State<'_, AppState>, file_name: String) -> Result<String, String> {
+    let path = state.projects.media_path(&file_name);
+    if !path.exists() {
+        return Err(format!("素材文件不存在: {file_name}"));
+    }
+    Ok(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn get_exports_dir(state: State<'_, AppState>) -> Result<String, String> {
+    Ok(state.projects.exports_dir().to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn open_export_folder(state: State<'_, AppState>, output_path: String) -> Result<(), String> {
+    let path = PathBuf::from(&output_path);
+    let exports_dir = state.projects.exports_dir();
+    let folder = path.parent().unwrap_or(exports_dir.as_path());
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(folder).status();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("explorer").arg(folder).status();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(folder).status();
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -245,6 +279,9 @@ pub fn run() {
             load_project,
             save_project,
             import_media,
+            get_media_path,
+            get_exports_dir,
+            open_export_folder,
             list_effect_presets,
             add_still_frame,
             analyze_color_from_photo,

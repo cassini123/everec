@@ -1,0 +1,11 @@
+packages:
+  - "shared"
+  - "portal"
+  - "desound/web/frontend"
+  - "desound/web/backend"
+  - "desound/desktop/ui"
+  - "simcut/web/frontend"
+  - "knowgo/web/frontend"
+  - "knowgo/web/backend"
+  - "prerector/web/frontend"
+  - "prerector/web/backend"

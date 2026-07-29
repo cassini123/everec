@@ -9,7 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@everec/shared": "*",
+    "@everec/shared": "workspace:*",
     "@hono/node-server": "^1.14.3",
     "hono": "^4.7.10",
     "uuid": "^11.1.0"

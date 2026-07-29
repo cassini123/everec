@@ -9,7 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@everec/shared": "*",
+    "@everec/shared": "workspace:*",
     "@hono/node-server": "^1.14.3",
     "better-sqlite3": "^11.10.0",
     "hono": "^4.7.10",

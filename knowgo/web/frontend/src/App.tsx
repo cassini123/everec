@@ -10,6 +10,7 @@ import { GraphView } from "./views/GraphView";
 import { api, getStoredApiKey, setStoredApiKey } from "./lib/api";
 import { setGraphNavigation } from "./lib/graphNav";
 import type { KnowgoProject, KnowgoWorkspace } from "./types";
+import { DEFAULT_BRIEF, DEFAULT_DOCUMENT, DEFAULT_STYLE_GUIDE } from "@everec/shared";
 
 export default function App() {
   const [workspace, setWorkspace] = useState<KnowgoWorkspace>("brief");
@@ -35,7 +36,18 @@ export default function App() {
         setProject(await api.createProject("我的灵感项目"));
       }
     } catch (err) {
-      setError(String(err));
+      // 后端不可用时，使用本地离线项目以保证 UI 可展示
+      setError("");
+      setProject({
+        id: "offline-demo",
+        title: "我的灵感项目",
+        brief: { ...DEFAULT_BRIEF },
+        captures: [],
+        document: { ...DEFAULT_DOCUMENT },
+        styleGuide: { ...DEFAULT_STYLE_GUIDE },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     } finally {
       setLoading(false);
     }

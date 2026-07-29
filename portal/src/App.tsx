@@ -104,7 +104,7 @@ export default function App() {
             </div>
             <div>
               <div className="text-sm font-semibold tracking-wide">Everec 每刻</div>
-              <div className="text-xs text-ev-muted">创作者认知增强系统</div>
+              <div className="text-xs text-ev-muted">灵感创作</div>
             </div>
           </div>
         </div>
@@ -149,9 +149,6 @@ export default function App() {
           })}
         </nav>
 
-        <div className="border-t border-ev-border px-5 py-4 text-[11px] text-ev-muted">
-          Vercel 统一部署 · Web 端
-        </div>
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col">

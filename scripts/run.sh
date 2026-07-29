@@ -8,4 +8,4 @@ cd "$PROJECT_DIR"
 PORT="${DEPLOY_RUN_PORT:-5000}"
 
 echo "Serving portal dist on port $PORT..."
-exec npx serve portal/dist -l "$PORT"
+exec pnpm exec serve portal/dist -l "$PORT"

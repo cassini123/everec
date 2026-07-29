@@ -37,6 +37,7 @@
   "dependencies": {
     "@everec/shared": "workspace:*",
     "hono": "^4.7.10",
+    "serve": "^14.2.4",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

@@ -105,7 +105,9 @@ pnpm dev:prerector   # Prerector :1423
 
 ### 注意事项
 
-- 预览模式下 portal 的 iframe 代理需要各子产品 dev 服务同时运行，但预览环境仅启动 portal 本身
+- 预览模式下，`coze-preview-build.sh` 会构建所有子产品（跳过 tsc，仅 vite build）并将产物复制到 `portal/public/apps/` 下，由 Vite dev server 作为静态文件提供
+- `portal/vite.config.ts` 通过 `COZE_PREVIEW=true` 环境变量区分预览模式和本地开发模式：预览模式下不代理 `/apps/*` 请求（由 public 目录提供静态文件），本地开发模式下代理到各子产品 dev 服务
+- 门户 iframe 的 src 使用 `/apps/<product>/index.html` 格式（而非 `/apps/<product>/`），确保 Vite dev server 能正确提供子产品页面而非 portal 的 SPA fallback
 - 部署构建仅构建 portal 主入口，不包含子产品独立构建（子产品通过 Vercel 统一部署）
 - `serve` 依赖需要作为 devDependency 或在 run.sh 中通过 npx 自动安装
 

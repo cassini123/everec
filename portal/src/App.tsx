@@ -34,7 +34,7 @@ const NAV_ITEMS: NavItem[] = [
     subtitle: "轻量视频剪辑",
     icon: Clapperboard,
     color: "var(--color-ev-simcut)",
-    href: "/apps/simcut/",
+    href: "/apps/simcut/index.html",
   },
   {
     id: "desound",
@@ -42,7 +42,7 @@ const NAV_ITEMS: NavItem[] = [
     subtitle: "音频 / 音效创作",
     icon: Music2,
     color: "var(--color-ev-desound)",
-    href: "/apps/desound/",
+    href: "/apps/desound/index.html",
   },
   {
     id: "knowgo",
@@ -50,7 +50,7 @@ const NAV_ITEMS: NavItem[] = [
     subtitle: "视觉灵感 · Project Graph",
     icon: Sparkles,
     color: "var(--color-ev-knowgo)",
-    href: "/apps/knowgo/",
+    href: "/apps/knowgo/index.html",
   },
   {
     id: "prerector",
@@ -58,7 +58,7 @@ const NAV_ITEMS: NavItem[] = [
     subtitle: "协作制片 · 任务 / 群聊",
     icon: Users,
     color: "var(--color-ev-prerector)",
-    href: "/apps/prerector/",
+    href: "/apps/prerector/index.html",
   },
 ];
 

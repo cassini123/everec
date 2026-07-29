@@ -7,6 +7,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import AIWidget from "./components/AIWidget";
 
 type AppId = "home" | "simcut" | "desound" | "knowgo" | "prerector";
 
@@ -177,6 +178,9 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* AI 悬浮助手 */}
+      <AIWidget />
     </div>
   );
 }
@@ -219,16 +223,6 @@ function HomeView({ onNavigate }: { onNavigate: (app: AppId) => void }) {
               </button>
             );
           })}
-        </div>
-
-        <div className="mt-12 rounded-2xl border border-ev-border bg-ev-surface/50 p-6">
-          <h2 className="text-sm font-medium text-ev-muted">部署说明</h2>
-          <ul className="mt-3 space-y-2 text-sm text-ev-muted">
-            <li>· 四个产品共享同一 Vercel 域名，Root Directory 设为仓库根 <code className="text-ev-text">/</code></li>
-            <li>· Desound API：<code className="text-ev-text">/api/*</code></li>
-            <li>· Knowgo API：<code className="text-ev-text">/api/knowgo/*</code></li>
-            <li>· Prerector API：<code className="text-ev-text">/api/prerector/*</code></li>
-          </ul>
         </div>
       </div>
     </div>

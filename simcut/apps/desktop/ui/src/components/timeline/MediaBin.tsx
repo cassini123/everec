@@ -45,7 +45,7 @@ export function MediaBin({ media, selectedMediaId, onSelect }: Props) {
   if (media.length === 0) {
     return (
       <div className="border-t border-sc-border bg-sc-surface px-3 py-2 text-[10px] text-sc-muted">
-        素材库为空 — 支持 JPG/PNG 图片与 MP4/MOV 视频
+        素材库为空 — 支持视频/图片/音频（MP4、JPG、MP3 等）
       </div>
     );
   }

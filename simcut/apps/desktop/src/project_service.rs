@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use crate::export_service::probe_duration_ms;
+use crate::export_service::probe_media;
 use timeline_engine::{MediaAsset, Project, StillFrame, SubtitleCue};
 use uuid::Uuid;
 
@@ -132,7 +132,18 @@ impl ProjectService {
                 .to_string()
         });
 
-        let duration_ms = probe_duration_ms(&dest);
+        let probe = probe_media(&dest);
+        let is_image = is_image_ext(&ext);
+        let is_audio = probe.has_audio && !probe.has_video && !is_image;
+        let duration_ms = if is_image {
+            5000
+        } else if probe.duration_ms > 0 {
+            probe.duration_ms
+        } else if is_audio {
+            probe.duration_ms.max(1000)
+        } else {
+            5000
+        };
 
         let asset = MediaAsset {
             id: id.clone(),
@@ -140,27 +151,26 @@ impl ProjectService {
             file_name,
             format: ext,
             duration_ms,
-            width: 1920,
-            height: 1080,
+            width: probe.width.max(1),
+            height: probe.height.max(1),
             tags: tags.unwrap_or_default(),
             created_at: chrono_now(),
         };
 
         let mut project = self.load_project(project_id)?;
 
-        if duration_ms > 0 {
-            let clip = timeline_engine::Clip {
-                id: Uuid::new_v4().to_string(),
-                track_index: 0,
-                media_id: id.clone(),
-                start_ms: 0,
-                duration_ms,
-                trim_in_ms: 0,
-                trim_out_ms: duration_ms,
-                effect_ids: Vec::new(),
-            };
-            let _ = project.add_clip(clip);
-        }
+        let track_index = if is_audio { 1 } else { 0 };
+        let clip = timeline_engine::Clip {
+            id: Uuid::new_v4().to_string(),
+            track_index,
+            media_id: id.clone(),
+            start_ms: 0,
+            duration_ms,
+            trim_in_ms: 0,
+            trim_out_ms: duration_ms,
+            effect_ids: Vec::new(),
+        };
+        let _ = project.add_clip(clip);
 
         project.add_media(asset.clone());
         self.save_project(&project)?;
@@ -231,6 +241,13 @@ impl ProjectService {
         )
         .map_err(|e| e.to_string())
     }
+}
+
+fn is_image_ext(ext: &str) -> bool {
+    matches!(
+        ext,
+        "jpg" | "jpeg" | "png" | "webp" | "gif" | "bmp" | "heic" | "heif"
+    )
 }
 
 fn chrono_now() -> String {

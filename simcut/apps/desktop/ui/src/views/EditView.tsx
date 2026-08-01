@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Film, Image, Upload, Video } from "lucide-react";
+import { Camera, Film, Image, Music, Upload, Video } from "lucide-react";
 import { AspectRatioPicker } from "../components/edit/AspectRatioPicker";
 import { ResizableSplit } from "../components/edit/ResizableSplit";
 import { MediaBin } from "../components/timeline/MediaBin";
 import { Timeline } from "../components/timeline/Timeline";
-import { api, formatMs } from "../lib/api";
+import { api, formatMs, subtitleAtTime } from "../lib/api";
+import { isTauriApp } from "../lib/tauri";
 import { aspectCssRatio } from "../lib/aspectRatio";
 import { capturePreviewFrame } from "../lib/captureFrame";
 import { resolvePreviewKind } from "../lib/fonts";
@@ -31,7 +32,7 @@ export function EditView({
   const imageRef = useRef<HTMLImageElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewKind, setPreviewKind] = useState<"video" | "image" | null>(null);
+  const [previewKind, setPreviewKind] = useState<"video" | "image" | "audio" | null>(null);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -119,8 +120,31 @@ export function EditView({
     );
   };
 
+  const activeSubtitle = subtitleAtTime(project, positionMs);
+
+  const importDesktop = async () => {
+    setImporting(true);
+    setMessage("");
+    setLoadError("");
+    try {
+      const updated = await api.pickAndImportMedia(project);
+      onProjectUpdate(updated);
+      const lastMedia = updated.media[updated.media.length - 1];
+      if (lastMedia) setSelectedMediaId(lastMedia.id);
+      setMessage(`已导入 ${updated.media.length - project.media.length} 个素材`);
+    } catch (err) {
+      setLoadError(String(err));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const importFiles = async (files: FileList | null) => {
     if (!files?.length) return;
+    if (isTauriApp()) {
+      await importDesktop();
+      return;
+    }
     setImporting(true);
     setMessage("");
     setLoadError("");
@@ -164,6 +188,19 @@ export function EditView({
     onProjectUpdate(updated);
     setSelectedClipId(null);
   };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (!selectedClipId) return;
+      e.preventDefault();
+      handleRemoveClip(selectedClipId);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedClipId, project]);
 
   const handleAspectChange = (resolution: [number, number]) => {
     onProjectUpdate({ ...project, resolution });
@@ -222,14 +259,14 @@ export function EditView({
               ref={fileRef}
               type="file"
               multiple
-              accept="video/*,image/*,.mov,.mp4,.m4v,.mkv,.webm,.jpg,.jpeg,.png,.webp,.gif"
+              accept="video/*,image/*,audio/*,.mov,.mp4,.m4v,.mkv,.webm,.jpg,.jpeg,.png,.webp,.gif,.mp3,.wav,.m4a"
               className="hidden"
               onChange={(e) => importFiles(e.target.files)}
             />
             <button
               type="button"
               disabled={importing}
-              onClick={() => fileRef.current?.click()}
+              onClick={() => (isTauriApp() ? importDesktop() : fileRef.current?.click())}
               className="flex items-center gap-1.5 rounded-lg bg-sc-accent px-3 py-1.5 text-xs text-white hover:bg-sc-accent-dim disabled:opacity-50"
             >
               <Upload size={12} />
@@ -249,13 +286,18 @@ export function EditView({
                 src={previewUrl}
                 className="h-full w-full object-contain"
                 playsInline
-                muted
                 preload="auto"
                 onTimeUpdate={handleTimeUpdate}
                 onCanPlay={() => setLoadError("")}
                 onError={() => setLoadError("视频解码失败，请转为 H.264 MP4")}
                 onEnded={() => onPositionChange(activeClip?.startMs ?? 0)}
               />
+            ) : previewUrl && previewKind === "audio" ? (
+              <div className="flex flex-col items-center justify-center gap-3 text-sc-muted">
+                <Music size={48} className="opacity-40" />
+                <audio src={previewUrl} controls className="w-4/5" />
+                <p className="text-xs">{previewMedia?.name}</p>
+              </div>
             ) : previewUrl && previewKind === "image" ? (
               <img
                 ref={imageRef}
@@ -280,6 +322,14 @@ export function EditView({
                     <Image size={10} /> JPG PNG
                   </span>
                 </div>
+              </div>
+            )}
+
+            {activeSubtitle && (
+              <div className="pointer-events-none absolute bottom-8 left-0 right-0 px-6 text-center">
+                <span className="inline-block rounded bg-black/70 px-3 py-1.5 text-sm text-white shadow-lg">
+                  {activeSubtitle.text}
+                </span>
               </div>
             )}
 

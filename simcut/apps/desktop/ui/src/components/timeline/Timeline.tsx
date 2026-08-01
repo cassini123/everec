@@ -281,7 +281,11 @@ export function Timeline({
                 })}
                 {track.clips.length === 0 && (
                   <div className="pointer-events-none flex h-full items-center justify-center text-[10px] text-sc-muted">
-                    拖入图片/视频素材
+                    {track.kind === "audio"
+                      ? "拖入 MP3/WAV 音频"
+                      : track.kind === "subtitle"
+                        ? "字幕在时间轴下方显示"
+                        : "拖入图片/视频素材"}
                   </div>
                 )}
               </div>

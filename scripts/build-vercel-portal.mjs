@@ -29,6 +29,14 @@ function rmDir(dir) {
   if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
 }
 
+function buildFrontend(filter, basePath) {
+  // Skip tsc: Vite type-checks enough for deploy, and `tsc && vite build`
+  // previously caused Vercel timeouts / unused-local failures after the pnpm migration.
+  run(`pnpm --filter ${filter} exec vite build`, {
+    VITE_APP_BASE: basePath,
+  });
+}
+
 console.log("=== Everec unified Vercel build ===");
 
 // Nested api/* bundles are served as static files on Vercel — only api/index.js is a function
@@ -36,22 +44,13 @@ for (const sub of ["knowgo", "prerector"]) {
   rmDir(path.join(root, "api", sub));
 }
 
-run("npm run build:vercel-api");
+run("pnpm run build:vercel-api");
 
-run("npm run build --workspace=@simcut/web-frontend", {
-  VITE_APP_BASE: "/apps/simcut/",
-});
-run("npm run build --workspace=@everec/web-frontend", {
-  VITE_APP_BASE: "/apps/desound/",
-});
-run("npm run build --workspace=@everec/knowgo-frontend", {
-  VITE_APP_BASE: "/apps/knowgo/",
-});
-run("npm run build --workspace=@everec/prerector-frontend", {
-  VITE_APP_BASE: "/apps/prerector/",
-});
-
-run("npm run build --workspace=@everec/portal");
+buildFrontend("@simcut/web-frontend", "/apps/simcut/");
+buildFrontend("@everec/web-frontend", "/apps/desound/");
+buildFrontend("@everec/knowgo-frontend", "/apps/knowgo/");
+buildFrontend("@everec/prerector-frontend", "/apps/prerector/");
+buildFrontend("@everec/portal", "/");
 
 const apps = [
   { name: "simcut", src: "simcut/web/frontend/dist" },

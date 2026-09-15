@@ -1,5 +1,3 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import type {
   AiAnalysisResult,
   ColorAnalysisResult,
@@ -25,17 +23,6 @@ function requireDesktop<T>(fn: () => Promise<T>): Promise<T> {
   if (!isTauriApp()) return Promise.reject(new Error(DESKTOP_APP_HINT));
   return fn();
 }
-
-const MEDIA_FILTERS = [
-  {
-    name: "媒体文件",
-    extensions: [
-      "mp4", "mov", "m4v", "webm", "mkv", "avi",
-      "jpg", "jpeg", "png", "webp", "gif",
-      "mp3", "wav", "m4a", "aac",
-    ],
-  },
-];
 
 function generateSubtitles(language: string, mediaId?: string): SubtitleCue[] {
   const langLabel =
@@ -157,36 +144,11 @@ export const api = {
     return { project: updated, asset };
   },
 
-  pickAndImportMedia: async (project: Project): Promise<Project> => {
-    const selected = await open({
-      multiple: true,
-      filters: MEDIA_FILTERS,
-    });
-    if (!selected) return project;
-
-    const paths = Array.isArray(selected) ? selected : [selected];
-    let current = project;
-    for (const sourcePath of paths) {
-      await invoke("import_media", {
-        projectId: current.id,
-        sourcePath,
-        name: null,
-        tags: [],
-      });
-      current = await api.loadProject(current.id);
-    }
-    return current;
+  pickAndImportMedia: async (_project: Project): Promise<Project> => {
+    return Promise.reject(new Error(DESKTOP_APP_HINT));
   },
 
   getMediaUrl: async (asset: MediaAsset): Promise<string | null> => {
-    if (isTauriApp()) {
-      try {
-        const path = await invoke<string>("get_media_path", { fileName: asset.fileName });
-        return convertFileSrc(path);
-      } catch {
-        return null;
-      }
-    }
     const blobId = asset.blobId ?? asset.id;
     const sync = mediaStore.getObjectUrlSync(blobId);
     if (sync) return sync;

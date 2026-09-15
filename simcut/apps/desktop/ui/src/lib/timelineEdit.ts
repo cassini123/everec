@@ -58,10 +58,18 @@ export function addClipToTrack(
   trackIndex: number,
   startMs: number,
 ): Project {
-  const durationMs = media.durationMs || 5000;
+  const kind = media.kind ?? guessKind(media.fileName, media.mimeType);
+  const isImage = kind === "image";
+  const isAudio = kind === "audio";
+
+  let targetTrack = trackIndex;
+  if (isAudio && trackIndex === 0) targetTrack = 1;
+  if (!isAudio && trackIndex === 1) targetTrack = 0;
+
+  const durationMs = isImage ? 5000 : media.durationMs || 5000;
   const clip: Clip = {
     id: crypto.randomUUID(),
-    trackIndex,
+    trackIndex: targetTrack,
     mediaId: media.id,
     startMs: Math.max(0, startMs),
     durationMs,
@@ -71,7 +79,7 @@ export function addClipToTrack(
   };
 
   const tracks: Track[] = project.tracks.map((t) =>
-    t.index === trackIndex ? { ...t, clips: [...t.clips, clip] } : t,
+    t.index === targetTrack ? { ...t, clips: [...t.clips, clip] } : t,
   );
 
   const newDuration = Math.max(project.durationMs, clip.startMs + clip.durationMs);

@@ -141,12 +141,15 @@ export async function loadWebFonts(): Promise<void> {
 
 export function resolvePreviewKind(
   media: { kind?: string; mimeType?: string; fileName: string },
-): "video" | "image" {
+): "video" | "image" | "audio" {
+  if (media.kind === "audio") return "audio";
   if (media.kind === "image") return "image";
   if (media.kind === "video") return "video";
   const mime = media.mimeType ?? "";
+  if (mime.startsWith("audio/")) return "audio";
   if (mime.startsWith("image/")) return "image";
   const ext = media.fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (["mp3", "wav", "m4a", "aac", "ogg", "flac"].includes(ext)) return "audio";
   if (["jpg", "jpeg", "png", "webp", "gif", "bmp"].includes(ext)) return "image";
   if (ext === "heic" || ext === "heif") return "image";
   return "video";

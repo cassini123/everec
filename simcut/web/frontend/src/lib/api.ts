@@ -1,3 +1,5 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import type {
   AiAnalysisResult,
   ColorAnalysisResult,
@@ -23,6 +25,17 @@ function requireDesktop<T>(fn: () => Promise<T>): Promise<T> {
   if (!isTauriApp()) return Promise.reject(new Error(DESKTOP_APP_HINT));
   return fn();
 }
+
+const MEDIA_FILTERS = [
+  {
+    name: "媒体文件",
+    extensions: [
+      "mp4", "mov", "m4v", "webm", "mkv", "avi",
+      "jpg", "jpeg", "png", "webp", "gif",
+      "mp3", "wav", "m4a", "aac",
+    ],
+  },
+];
 
 function generateSubtitles(language: string, mediaId?: string): SubtitleCue[] {
   const langLabel =
@@ -89,7 +102,7 @@ export const api = {
     tags?: string[],
   ): Promise<{ project: Project; asset: MediaAsset }> => {
     if (isTauriApp()) {
-      throw new Error("桌面端请使用 importMedia 命令");
+      throw new Error("桌面端请使用 pickAndImportMedia");
     }
 
     const id = crypto.randomUUID();
@@ -120,10 +133,12 @@ export const api = {
     };
 
     const isImage = kind === "image";
+    const isAudio = kind === "audio";
     const clipDuration = isImage ? 5000 : meta.durationMs || 5000;
+    const trackIndex = isAudio ? 1 : 0;
     const clip = {
       id: crypto.randomUUID(),
-      trackIndex: isImage ? 0 : 0,
+      trackIndex,
       mediaId: id,
       startMs: 0,
       durationMs: clipDuration,
@@ -136,16 +151,45 @@ export const api = {
       ...project,
       media: [...project.media, asset],
       durationMs: Math.max(project.durationMs, meta.durationMs),
-      resolution: [meta.width, meta.height],
+      resolution: meta.width > 0 ? [meta.width, meta.height] : project.resolution,
     };
     updated = projectStore.addClip(updated, clip);
     return { project: updated, asset };
   },
 
-  getMediaUrl: (asset: MediaAsset): Promise<string | null> => {
+  pickAndImportMedia: async (project: Project): Promise<Project> => {
+    const selected = await open({
+      multiple: true,
+      filters: MEDIA_FILTERS,
+    });
+    if (!selected) return project;
+
+    const paths = Array.isArray(selected) ? selected : [selected];
+    let current = project;
+    for (const sourcePath of paths) {
+      await invoke("import_media", {
+        projectId: current.id,
+        sourcePath,
+        name: null,
+        tags: [],
+      });
+      current = await api.loadProject(current.id);
+    }
+    return current;
+  },
+
+  getMediaUrl: async (asset: MediaAsset): Promise<string | null> => {
+    if (isTauriApp()) {
+      try {
+        const path = await invoke<string>("get_media_path", { fileName: asset.fileName });
+        return convertFileSrc(path);
+      } catch {
+        return null;
+      }
+    }
     const blobId = asset.blobId ?? asset.id;
     const sync = mediaStore.getObjectUrlSync(blobId);
-    if (sync) return Promise.resolve(sync);
+    if (sync) return sync;
     return mediaStore.getObjectUrl(blobId);
   },
 
@@ -256,6 +300,32 @@ export const api = {
     return Promise.resolve(cues);
   },
 
+  addSubtitle: (project: Project, cue: Omit<SubtitleCue, "id">): Promise<Project> => {
+    const newCue: SubtitleCue = { ...cue, id: crypto.randomUUID() };
+    return Promise.resolve({
+      ...project,
+      subtitles: [...project.subtitles, newCue],
+    });
+  },
+
+  updateSubtitle: (
+    project: Project,
+    cueId: string,
+    patch: Partial<Pick<SubtitleCue, "text" | "startMs" | "endMs" | "language">>,
+  ): Promise<Project> =>
+    Promise.resolve({
+      ...project,
+      subtitles: project.subtitles.map((c) =>
+        c.id === cueId ? { ...c, ...patch } : c,
+      ),
+    }),
+
+  removeSubtitle: (project: Project, cueId: string): Promise<Project> =>
+    Promise.resolve({
+      ...project,
+      subtitles: project.subtitles.filter((c) => c.id !== cueId),
+    }),
+
   analyzeFrameAi: (description: string, frameIndex: number): Promise<AiAnalysisResult> =>
     isTauriApp()
       ? invoke("analyze_frame_ai", { description, frameIndex })
@@ -276,8 +346,14 @@ export const api = {
     return exportProjectWeb(projectId, options);
   },
 
+  openExportFolder: (outputPath: string): Promise<void> =>
+    requireDesktop(() => invoke("open_export_folder", { outputPath })),
+
   getProjectsDir: (): Promise<string> =>
     requireDesktop(() => invoke("get_projects_dir")),
+
+  getExportsDir: (): Promise<string> =>
+    requireDesktop(() => invoke("get_exports_dir")),
 };
 
 function applyPromptLocal(prompt: string): string {
@@ -352,4 +428,12 @@ export function formatMs(ms: number): string {
   const m = Math.floor(s / 60);
   const rem = s % 60;
   return `${m}:${rem.toString().padStart(2, "0")}`;
+}
+
+export function subtitleAtTime(project: Project, timeMs: number): SubtitleCue | null {
+  return (
+    project.subtitles.find(
+      (c) => timeMs >= c.startMs && timeMs < c.endMs,
+    ) ?? null
+  );
 }

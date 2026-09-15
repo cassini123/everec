@@ -1,4 +1,4 @@
-import { guessMime, isImageFile, isVideoFile } from "./mime";
+import { guessKind, guessMime } from "./mime";
 import { cachePreviewUrl, getCachedUrl, setCachedUrl } from "./previewCache";
 
 const DB_NAME = "simcut-media";
@@ -156,24 +156,44 @@ export async function probeMedia(file: File): Promise<{
   durationMs: number;
   width: number;
   height: number;
-  kind: "video" | "image";
+  kind: "video" | "image" | "audio";
 }> {
   const mime = file.type || guessMime(file.name);
-  if (isVideoFile(file.name, mime)) {
-    const meta = await probeVideo(file);
-    return { ...meta, kind: "video" };
+  const kind = guessKind(file.name, mime);
+  if (kind === "audio") {
+    const meta = await probeAudio(file);
+    return { ...meta, kind: "audio" };
   }
-  if (isImageFile(file.name, mime)) {
+  if (kind === "image") {
     const meta = await probeImage(file);
     return { ...meta, kind: "image" };
   }
-  try {
-    const meta = await probeVideo(file);
-    return { ...meta, kind: "video" };
-  } catch {
-    const meta = await probeImage(file);
-    return { ...meta, kind: "image" };
-  }
+  const meta = await probeVideo(file);
+  return { ...meta, kind: "video" };
+}
+
+async function probeAudio(file: File): Promise<{
+  durationMs: number;
+  width: number;
+  height: number;
+}> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const audio = document.createElement("audio");
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      const durationMs = Number.isFinite(audio.duration)
+        ? Math.round(audio.duration * 1000)
+        : 0;
+      URL.revokeObjectURL(url);
+      resolve({ durationMs, width: 0, height: 0 });
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve({ durationMs: 0, width: 0, height: 0 });
+    };
+    audio.src = url;
+  });
 }
 
 export async function captureVideoFrame(

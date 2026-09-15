@@ -21,7 +21,6 @@ export function MasterOverview({
   clips,
   beats,
   position,
-  playing,
   selectedTrack,
   onSelectTrack,
   onPositionChange,

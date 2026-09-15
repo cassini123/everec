@@ -57,6 +57,7 @@ export interface SoundAsset {
   category: string;
   createdAt: string;
   source: string;
+  audioUrl?: string;
 }
 
 export interface MusicSearchResult {
@@ -75,6 +76,12 @@ export interface SfxSearchResult {
   title: string;
   previewUrl: string;
   source: string;
+  sourceLabel?: string;
+  sourceUrl?: string;
+  creator?: string;
+  license?: string;
+  fileType?: string;
+  referer?: string;
   durationMs?: number;
 }
 

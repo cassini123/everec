@@ -60,7 +60,7 @@ export function DesignView({
             />
           </div>
           <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <Sparkles className="h-5 w-5 text-ds-purple" />
+            <Sparkles className="h-5 w-5 text-ds-accent" />
             声音设计 · AI 辅助
           </h2>
           <p className="mt-1 text-xs text-ds-muted">
@@ -76,7 +76,7 @@ export function DesignView({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="例如：雨夜城市中的孤独感，带有轻微合成器底噪，适合纪录片片头…"
               rows={6}
-              className="w-full resize-none rounded-lg border border-ds-border bg-ds-bg px-4 py-3 text-sm leading-relaxed outline-none focus:border-ds-purple"
+              className="w-full resize-none rounded-lg border border-ds-border bg-ds-bg px-4 py-3 text-sm leading-relaxed outline-none focus:border-ds-accent"
             />
           </div>
 
@@ -90,7 +90,7 @@ export function DesignView({
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="sk-..."
-              className="w-full rounded border border-ds-border bg-ds-bg px-3 py-2 font-mono text-sm outline-none focus:border-ds-purple"
+              className="w-full rounded border border-ds-border bg-ds-bg px-3 py-2 font-mono text-sm outline-none focus:border-ds-accent"
             />
           </div>
 
@@ -98,7 +98,7 @@ export function DesignView({
             type="button"
             onClick={handleAnalyze}
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg bg-ds-purple px-5 py-2.5 text-sm font-medium text-white transition hover:bg-ds-purple/80 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-ds-accent px-5 py-2.5 text-sm font-medium text-white transition hover:bg-ds-accent-dim disabled:opacity-50"
           >
             <Search className="h-4 w-4" />
             {loading ? "分析中…" : "分析声音设计"}
@@ -112,7 +112,7 @@ export function DesignView({
         <div className="border-b border-ds-border px-4 py-3 text-xs font-medium uppercase tracking-wider text-ds-muted">
           分析结果
           {result && (
-            <span className="ml-2 normal-case text-ds-purple">
+            <span className="ml-2 normal-case text-ds-accent">
               · {result.source === "llm" ? "LLM" : "本地"}
             </span>
           )}
@@ -148,7 +148,7 @@ export function DesignView({
                 <button
                   type="button"
                   onClick={() => onApplyKeywords(result.keywords)}
-                  className="mt-2 text-xs text-ds-blue hover:underline"
+                  className="mt-2 text-xs text-ds-accent hover:underline"
                 >
                   应用到项目标签
                 </button>
@@ -165,7 +165,7 @@ export function DesignView({
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{style.nameZh}</span>
-                      <span className="font-mono text-xs text-ds-green">
+                      <span className="font-mono text-xs text-ds-accent">
                         {(style.similarity * 100).toFixed(0)}%
                       </span>
                     </div>
@@ -188,7 +188,7 @@ export function DesignView({
               <ul className="space-y-1.5 text-sm text-ds-muted">
                 {result.suggestions.map((s, i) => (
                   <li key={i} className="flex gap-2">
-                    <span className="text-ds-purple">·</span>
+                    <span className="text-ds-accent">·</span>
                     {s}
                   </li>
                 ))}

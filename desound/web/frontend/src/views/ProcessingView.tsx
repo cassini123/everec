@@ -34,7 +34,7 @@ export function ProcessingView({
           />
         </div>
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Waves className="h-5 w-5 text-ds-blue" />
+          <Waves className="h-5 w-5 text-ds-accent" />
           声音处理
         </h2>
         <p className="mt-1 text-xs text-ds-muted">
@@ -53,13 +53,13 @@ export function ProcessingView({
                 onClick={() => onApplyPreset(preset.id, preset.effects)}
                 className={`rounded-lg border p-4 text-left transition ${
                   active
-                    ? "border-ds-blue bg-ds-blue/10 ring-1 ring-ds-blue/40"
+                    ? "border-ds-accent bg-ds-accent/10 ring-1 ring-ds-accent/40"
                     : "border-ds-border bg-ds-panel hover:border-ds-muted"
                 }`}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-2xl">{preset.icon}</span>
-                  {active && <Check className="h-4 w-4 text-ds-blue" />}
+                  {active && <Check className="h-4 w-4 text-ds-accent" />}
                 </div>
                 <div className="font-medium">{preset.nameZh}</div>
                 <div className="text-[11px] text-ds-muted">{preset.name}</div>

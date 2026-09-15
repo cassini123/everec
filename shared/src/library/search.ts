@@ -15,13 +15,23 @@ import {
   formatResultLabel,
   isRemixOrLive,
   normalizeSongTitle,
+  parseSongFromText,
   songKey,
   splitQuery,
 } from "./parseTitle";
 
 async function fetchJson<T>(url: string, referer?: string): Promise<T> {
-  const headers: Record<string, string> = { "User-Agent": USER_AGENT };
-  if (referer) headers.Referer = referer;
+  const headers: Record<string, string> = {
+    "User-Agent": USER_AGENT,
+    Accept: "application/json, text/plain, */*",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+  };
+  if (referer) {
+    headers.Referer = referer;
+    if (referer.startsWith("https://search.bilibili.com")) {
+      headers.Origin = "https://search.bilibili.com";
+    }
+  }
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(url, { headers });
     if (res.status === 412 && attempt === 0) {
@@ -46,16 +56,19 @@ function scoreCandidate(
   const title = normalizeSongTitle(item.title);
   const artist = item.artist.toLowerCase().replace(/\s/g, "");
   const titleHit = !!(qt && (title === qt || title.includes(qt) || qt.includes(title)));
+  const artistTokenTitleHit = !!(qa && title.includes(qa));
   const artistHit = !!(qa && artist.includes(qa));
 
   if (titleHit && artistHit) score += 300;
   else if (titleHit) score += 80;
+  else if (artistTokenTitleHit) score += 80;
   else if (artistHit) score += 80;
 
-  if (qa && !artistHit) score -= 120;
+  if (qa && !artistHit && !artistTokenTitleHit) score -= 120;
 
   if (item.album) score += 20;
   if (item.previewUrl) score += 10;
+  if (item.playBvid) score += 5;
   if (item.album && !/live|现场/i.test(item.album)) score += 15;
   if (isRemixOrLive(item.title) && !/live|版|dj|remix/i.test(query.title + query.artist)) score -= 60;
   if (item.album && /live|现场/i.test(item.album) && !/live|现场/i.test(query.title + query.artist)) {
@@ -75,7 +88,9 @@ function isRelevantResult(
 
   if (!hintTitle && hintArtist) {
     const artist = item.artist.toLowerCase().replace(/\s/g, "");
-    return artist.includes(hintArtist);
+    const title = normalizeSongTitle(item.title);
+    const album = normalizeSongTitle(item.album ?? "");
+    return artist.includes(hintArtist) || title.includes(hintArtist) || album.includes(hintArtist);
   }
 
   if (!hintTitle) return true;
@@ -103,7 +118,7 @@ function mergeResult(base: MusicSearchResult, other: MusicSearchResult): MusicSe
     ...base,
     album: base.album || other.album,
     coverUrl: base.coverUrl || other.coverUrl,
-    previewUrl: base.previewUrl || other.previewUrl,
+    previewUrl: base.previewUrl || (base.source === other.source ? other.previewUrl : undefined),
     durationMs: base.durationMs || other.durationMs,
   };
 }
@@ -149,6 +164,76 @@ async function searchItunes(
   return results;
 }
 
+function normalizeImageUrl(raw?: unknown): string | undefined {
+  const url = raw ? String(raw).trim() : "";
+  if (!url) return undefined;
+  if (url.startsWith("//")) return `https:${url}`;
+  return url;
+}
+
+function parseBilibiliDuration(raw?: unknown): number {
+  if (typeof raw === "number") return raw * 1000;
+  const value = raw ? String(raw).trim() : "";
+  if (!value) return 0;
+  const parts = value.split(":").map((part) => Number(part));
+  if (parts.some((part) => Number.isNaN(part))) return 0;
+  return parts.reduce((total, part) => total * 60 + part, 0) * 1000;
+}
+
+async function searchBilibili(
+  query: string,
+  limit: number,
+  hint: { title: string; artist: string },
+): Promise<MusicSearchResult[]> {
+  const pageSize = Math.max(limit, 20);
+  const params = new URLSearchParams({
+    search_type: "video",
+    keyword: query,
+    page_size: String(pageSize),
+    page: "1",
+    order: "totalrank",
+    duration: "0",
+    tids: "0",
+  });
+  const url = `https://api.bilibili.com/x/web-interface/search/type?${params.toString()}`;
+  const data = await fetchJson<{ data?: { result?: Record<string, unknown>[] } }>(
+    url,
+    "https://search.bilibili.com/",
+  );
+  const results: MusicSearchResult[] = [];
+
+  for (const item of data.data?.result ?? []) {
+    const bvid = String(item.bvid ?? "").trim();
+    if (!bvid) continue;
+
+    const rawTitle = String(item.title ?? "").trim();
+    const parsed = parseSongFromText(rawTitle, hint);
+    const title = cleanSongTitle(parsed.title || rawTitle);
+    if (!title) continue;
+
+    const author = cleanArtist(String(item.author ?? ""));
+    const artist =
+      parsed.artist && parsed.artist !== "未知歌手"
+        ? cleanArtist(parsed.artist)
+        : hint.artist
+          ? cleanArtist(hint.artist)
+          : author;
+
+    results.push({
+      id: `bilibili:${bvid}`,
+      title,
+      artist,
+      album: rawTitle.replace(/<[^>]+>/g, "") || "Bilibili",
+      durationMs: parseBilibiliDuration(item.duration),
+      coverUrl: normalizeImageUrl(item.pic),
+      source: "bilibili",
+      playBvid: bvid,
+    });
+  }
+
+  return results;
+}
+
 /** 同一首歌只保留得分最高的一条，并合并专辑等元数据 */
 function dedupeOnePerSong(
   items: MusicSearchResult[],
@@ -184,12 +269,16 @@ export async function searchMusicOnline(query: string, limit = 20): Promise<Musi
   const keywords = extractQueryKeywords(q, hint);
   const searchTerm =
     hint.artist && hint.title ? `${hint.artist} ${hint.title}`.trim() : hint.artist || hint.title || q;
-  const [broad, focused] = await Promise.all([
+  const [broad, focused, bilibiliBroad, bilibiliFocused] = await Promise.all([
     searchItunes(q, limit * 3, hint).catch(() => []),
     searchTerm !== q ? searchItunes(searchTerm, limit * 3, hint).catch(() => [] as MusicSearchResult[]) : Promise.resolve([]),
+    searchBilibili(q, limit * 3, hint).catch(() => []),
+    searchTerm !== q
+      ? searchBilibili(searchTerm, limit * 3, hint).catch(() => [] as MusicSearchResult[])
+      : Promise.resolve([]),
   ]);
-  const itunes = [...focused, ...broad];
-  const merged = dedupeOnePerSong(itunes, hint, keywords);
+  const candidates = [...focused, ...broad, ...bilibiliFocused, ...bilibiliBroad];
+  const merged = dedupeOnePerSong(candidates, hint, keywords);
   const relevant = merged.filter((item) => isRelevantResult(item, hint));
   const picked = (relevant.length ? relevant : merged).slice(0, limit);
 

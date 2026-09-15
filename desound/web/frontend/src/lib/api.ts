@@ -160,6 +160,7 @@ export const api = {
       source: result.source,
     });
     if (result.previewUrl) params.set("previewUrl", result.previewUrl);
+    if (result.playBvid) params.set("playBvid", result.playBvid);
     return `${API}/search/play?${params.toString()}`;
   },
 

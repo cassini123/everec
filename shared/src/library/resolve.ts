@@ -52,5 +52,17 @@ export async function resolveMusicAudioUrl(result: MusicSearchResult): Promise<{
     };
   }
 
+  const bvid = result.playBvid ?? (result.id.startsWith("bilibili:") ? result.id.slice("bilibili:".length) : "");
+  if (result.source === "bilibili" && bvid) {
+    const url = await getBilibiliAudioUrl(bvid);
+    if (url) {
+      return {
+        url,
+        referer: BILI_REFERER,
+        ext: url.includes(".mp3") ? "mp3" : "m4a",
+      };
+    }
+  }
+
   throw new Error("暂时无法解析该歌曲，请换一条结果或上传本地文件");
 }

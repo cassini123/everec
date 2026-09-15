@@ -36,22 +36,22 @@ for (const sub of ["knowgo", "prerector"]) {
   rmDir(path.join(root, "api", sub));
 }
 
-run("npm run build:vercel-api");
+run("pnpm run build:vercel-api");
 
-run("npm run build --workspace=@simcut/web-frontend", {
+run("pnpm --filter @simcut/web-frontend exec vite build", {
   VITE_APP_BASE: "/apps/simcut/",
 });
-run("npm run build --workspace=@everec/web-frontend", {
+run("pnpm --filter @everec/web-frontend exec vite build", {
   VITE_APP_BASE: "/apps/desound/",
 });
-run("npm run build --workspace=@everec/knowgo-frontend", {
+run("pnpm --filter @everec/knowgo-frontend exec vite build", {
   VITE_APP_BASE: "/apps/knowgo/",
 });
-run("npm run build --workspace=@everec/prerector-frontend", {
+run("pnpm --filter @everec/prerector-frontend exec vite build", {
   VITE_APP_BASE: "/apps/prerector/",
 });
 
-run("npm run build --workspace=@everec/portal");
+run("pnpm --filter @everec/portal exec vite build");
 
 const apps = [
   { name: "simcut", src: "simcut/web/frontend/dist" },

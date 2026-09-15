@@ -7,7 +7,7 @@ const PROJECT_CONTEXT = `你是 Everec 每刻 Creative OS 项目的 AI 助手。
 
 ## 项目概述
 
-Everec 是一个创作者认知增强系统（Creative OS），采用 monorepo 架构，包含多个子产品：
+Everec 是一个灵感创作系统（Creative OS），采用 monorepo 架构，包含多个子产品：
 
 | 子产品 | 路径 | 说明 |
 |--------|------|------|

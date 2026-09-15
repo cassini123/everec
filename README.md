@@ -1,6 +1,6 @@
 # Everec
 
-创作者认知增强系统 — Creative OS monorepo。
+灵感创作 — Creative OS monorepo。
 
 | 项目 | 路径 | 说明 |
 |------|------|------|

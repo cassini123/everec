@@ -9,3 +9,4 @@ packages:
   - "knowgo/web/backend"
   - "prerector/web/frontend"
   - "prerector/web/backend"
+  - "hypit/web/frontend"

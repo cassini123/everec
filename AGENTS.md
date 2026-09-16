@@ -11,6 +11,7 @@ Everec 是一个灵感创作系统（Creative OS），采用 monorepo 架构，�
 | **Desound** | `desound/` | 音频/音效创作（Web + 桌面 Tauri） |
 | **Knowgo** | `knowgo/` | 视觉灵感认知 + Project Graph |
 | **Prerector** | `prerector/` | 协作制片（任务/好友/群聊） |
+| **Hypit** | `hypit/` | 爆款克隆工作流（词锚点 + 变体） |
 | **Shared** | `shared/` | 共享类型与工具库 |
 | **API** | `api/` | 统一 API 层（Vercel Serverless） |
 
@@ -55,6 +56,8 @@ everec/
 │   │   ├── frontend/    # Prerector 前端 (port 1423)
 │   │   └── backend/     # Prerector 后端
 │   └── api/             # Prerector Vercel API
+├── hypit/
+│   └── web/frontend/    # Hypit 前端 (port 1424)
 ├── shared/              # 共享库 (@everec/shared)
 ├── api/                 # 统一 API (Vercel Serverless)
 ├── scripts/             # 构建脚本
@@ -80,6 +83,7 @@ pnpm dev:simcut      # Simcut :1421
 pnpm dev:web         # Desound :1420
 pnpm dev:knowgo      # Knowgo :1422
 pnpm dev:prerector   # Prerector :1423
+pnpm dev:hypit       # Hypit :1424
 ```
 
 预览环境使用 portal 作为主入口，端口映射到 5000。

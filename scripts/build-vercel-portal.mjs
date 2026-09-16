@@ -50,6 +50,9 @@ run("pnpm --filter @everec/knowgo-frontend exec vite build", {
 run("pnpm --filter @everec/prerector-frontend exec vite build", {
   VITE_APP_BASE: "/apps/prerector/",
 });
+run("pnpm --filter @everec/hypit-frontend exec vite build", {
+  VITE_APP_BASE: "/apps/hypit/",
+});
 
 run("pnpm --filter @everec/portal exec vite build");
 
@@ -58,6 +61,7 @@ const apps = [
   { name: "desound", src: "desound/web/frontend/dist" },
   { name: "knowgo", src: "knowgo/web/frontend/dist" },
   { name: "prerector", src: "prerector/web/frontend/dist" },
+  { name: "hypit", src: "hypit/web/frontend/dist" },
 ];
 
 for (const app of apps) {

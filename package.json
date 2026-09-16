@@ -13,7 +13,8 @@
     "knowgo/web/frontend",
     "knowgo/web/backend",
     "prerector/web/frontend",
-    "prerector/web/backend"
+    "prerector/web/backend",
+    "hypit/web/frontend"
   ],
   "scripts": {
     "dev:portal": "pnpm --filter @everec/portal run dev",
@@ -21,11 +22,13 @@
     "dev:knowgo": "pnpm --filter @everec/knowgo-backend run dev & pnpm --filter @everec/knowgo-frontend run dev",
     "dev:simcut": "pnpm --filter @simcut/web-frontend run dev",
     "dev:prerector": "pnpm --filter @everec/prerector-backend run dev & pnpm --filter @everec/prerector-frontend run dev",
+    "dev:hypit": "pnpm --filter @everec/hypit-frontend run dev",
     "dev:desktop": "pnpm --filter @everec/desktop run dev",
     "build:web": "pnpm --filter @everec/web-frontend run build",
     "build:knowgo": "pnpm --filter @everec/knowgo-backend run build && pnpm --filter @everec/knowgo-frontend run build",
     "build:simcut": "pnpm --filter @simcut/web-frontend run build",
     "build:prerector": "pnpm --filter @everec/prerector-frontend run build",
+    "build:hypit": "pnpm --filter @everec/hypit-frontend run build",
     "build:vercel-api": "node api/scripts/build-vercel-api.mjs",
     "build:vercel-knowgo-api": "node knowgo/api/scripts/build-vercel-api.mjs",
     "build:vercel-knowgo": "pnpm run build:vercel-knowgo-api && pnpm --filter @everec/knowgo-frontend run build",

@@ -6,10 +6,11 @@ import {
   Music2,
   Sparkles,
   Users,
+  Wand2,
 } from "lucide-react";
 import AIWidget from "./components/AIWidget";
 
-type AppId = "home" | "simcut" | "desound" | "knowgo" | "prerector";
+type AppId = "home" | "simcut" | "desound" | "knowgo" | "prerector" | "hypit";
 
 interface NavItem {
   id: AppId;
@@ -27,6 +28,14 @@ const NAV_ITEMS: NavItem[] = [
     subtitle: "Creative OS 入口",
     icon: Home,
     color: "var(--color-ev-accent)",
+  },
+  {
+    id: "hypit",
+    label: "Hypit",
+    subtitle: "爆款克隆工作流",
+    icon: Wand2,
+    color: "var(--color-ev-hypit)",
+    href: "/apps/hypit/index.html",
   },
   {
     id: "simcut",
@@ -63,6 +72,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 function pathToApp(pathname: string): AppId {
+  if (pathname.startsWith("/hypit")) return "hypit";
   if (pathname.startsWith("/simcut")) return "simcut";
   if (pathname.startsWith("/desound")) return "desound";
   if (pathname.startsWith("/knowgo")) return "knowgo";
@@ -190,7 +200,7 @@ function HomeView({ onNavigate }: { onNavigate: (app: AppId) => void }) {
       <div className="mx-auto w-full max-w-4xl">
         <h1 className="text-3xl font-semibold tracking-tight">Everec Creative OS</h1>
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-ev-muted">
-          Simcut、Desound、Knowgo、Prerector 四个产品 Web 端已合并为统一入口。请从左侧目录选择产品，或点击下方卡片进入。
+          Hypit、Simcut、Desound、Knowgo、Prerector 五个产品 Web 端已合并为统一入口。请从左侧目录选择产品，或点击下方卡片进入。
         </p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">

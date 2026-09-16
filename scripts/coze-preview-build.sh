@@ -47,5 +47,12 @@ VITE_APP_BASE="/apps/prerector/" pnpm exec vite build
 cd "$PROJECT_DIR"
 cp -r prerector/web/frontend/dist "$PORTAL_PUBLIC/apps/prerector"
 
+# 构建 Hypit
+echo "Building Hypit..."
+cd hypit/web/frontend
+VITE_APP_BASE="/apps/hypit/" pnpm exec vite build
+cd "$PROJECT_DIR"
+cp -r hypit/web/frontend/dist "$PORTAL_PUBLIC/apps/hypit"
+
 echo "=== Preview build complete ==="
 echo "Sub-products built and copied to $PORTAL_PUBLIC/apps/"

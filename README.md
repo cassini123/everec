@@ -8,6 +8,7 @@
 | **desound** | `desound/` | 音频 / 音效创作 |
 | **Knowgo** | `knowgo/` | 视觉灵感认知 + Project Graph |
 | **Prerector** | `prerector/` | 协作制片（任务 / 好友 / 群聊） |
+| **Hypit** | `hypit/` | 爆款克隆工作流（词锚点 + 变体） |
 
 ## Vercel 在线部署
 
@@ -20,6 +21,7 @@
 | **Desound** | `/apps/desound/` |
 | **Knowgo** | `/apps/knowgo/` |
 | **Prerector** | `/apps/prerector/` |
+| **Hypit** | `/apps/hypit/` |
 
 1. [Vercel New Project](https://vercel.com/new) → 导入仓库
 2. **Root Directory** 留空（仓库根 `/`）
@@ -53,6 +55,7 @@ npm run dev:simcut      # Simcut Web · :1421
 npm run dev:web         # Desound Web · :1420
 npm run dev:knowgo      # Knowgo · :1422
 npm run dev:prerector   # Prerector · :1423
+npm run dev:hypit       # Hypit · :1424
 ```
 
 门户 dev 模式下 iframe 需各产品 dev 服务同时运行。
@@ -66,6 +69,7 @@ everec/
 ├── desound/
 ├── knowgo/
 ├── prerector/
+├── hypit/
 ├── shared/
 ├── api/
 └── docs/

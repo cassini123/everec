@@ -23,13 +23,14 @@ build_subproduct "Simcut" "simcut/web/frontend" "/apps/simcut/"
 build_subproduct "Desound" "desound/web/frontend" "/apps/desound/"
 build_subproduct "Knowgo" "knowgo/web/frontend" "/apps/knowgo/"
 build_subproduct "Prerector" "prerector/web/frontend" "/apps/prerector/"
+build_subproduct "Hypit" "hypit/web/frontend" "/apps/hypit/"
 
 echo "Building portal with Vite..."
 cd portal
 pnpm exec vite build
 
 echo "Copying sub-product builds into portal dist..."
-for product in simcut desound knowgo prerector; do
+for product in simcut desound knowgo prerector hypit; do
   src="$PROJECT_DIR/$product/web/frontend/dist"
   dest="$PROJECT_DIR/portal/dist/apps/$product"
   if [ -d "$src" ]; then

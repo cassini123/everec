@@ -28,22 +28,26 @@ function pickKind(prompt: string): FormatKind {
 function extractPairs(prompt: string): [string, string] {
   const vs = prompt.split(/\bvs\.?\b|对比|和|与/i).map((s) => s.trim());
   if (vs.length >= 2) {
-    const a = vs[0]!.split(/[,，:：]/).pop()?.trim() || "Hypit";
-    const b = vs[1]!.split(/[,，.。]/)[0]?.trim() || "CapCut";
-    return [shorten(a), shorten(b)];
+    const a = lastWord(vs[0]!);
+    const b = lastWord(vs[1]!.split(/[,，.。]/)[0] ?? vs[1]!);
+    return [a || "Hypit", b || "CapCut"];
   }
   return ["Hypit", "CapCut"];
 }
 
-function shorten(value: string): string {
-  const cleaned = value.replace(/clone|this|video|a|the|把|这个|视频/gi, "").trim();
-  return cleaned.slice(0, 18) || "Hypit";
+function lastWord(value: string): string {
+  const cleaned = value
+    .replace(/\b(clone|this|video|the|a|an|to|board|swap|ranking)\b/gi, " ")
+    .replace(/[把这个视频]/g, " ")
+    .trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  return (parts[parts.length - 1] ?? cleaned).slice(0, 18);
 }
 
 export function cloneFromPrompt(prompt: string): { source: string; kind: FormatKind } {
   const kind = pickKind(prompt);
   const [left, right] = extractPairs(prompt);
-  const title = prompt.trim().slice(0, 42) || "New clone";
+  const title = `${left} vs ${right}`;
 
   let wf: Workflow;
   if (kind === "podcast") {

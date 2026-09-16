@@ -58,7 +58,6 @@ export default defineConfig({
           "/apps/hypit": {
             target: "http://localhost:1424",
             changeOrigin: true,
-            rewrite: (p) => p.replace(/^\/apps\/hypit/, ""),
           },
           "/api/prerector": {
             target: "http://localhost:3003",
